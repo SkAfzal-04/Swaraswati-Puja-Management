@@ -25,8 +25,8 @@ export const addMember = async (req, res) => {
         return res.status(400).json({ message: "User ID already exists" })
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10)
-      const newUser = new User({ userId, password: hashedPassword, role: "Manager" })
+      
+      const newUser = new User({ userId, password: password, role: "Manager" })
       const savedUser = await newUser.save()
 
       // ✅ Assign the saved user's ID directly
