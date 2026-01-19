@@ -9,6 +9,7 @@ import LoginModal from "./components/LoginModal"
 import Home from "./pages/Home"
 import Members from "./pages/Members"
 import ChangePassword from "./pages/ChangePassword"
+import Budget from "./pages/Budget"
 
 export default function App() {
   const [role, setRole] = useState(null)
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/members" element={<Members />} />
         <Route path="/change-password" element={<ChangePassword />} />
+        <Route path="/budget" element={<Budget />} />
       </Routes>
 
       {/* ✅ LOGIN MODAL (GLOBAL) */}
