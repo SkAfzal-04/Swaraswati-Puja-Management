@@ -103,7 +103,7 @@ export const deleteMember = async (req, res) => {
     if (!member) return res.status(404).json({ message: "Member not found" })
 
     if (member.userId) await User.findByIdAndDelete(member.userId)
-    await member.remove()
+    await member.deleteOne()
 
     return res.json({ message: "Member deleted" })
   } catch (err) {
