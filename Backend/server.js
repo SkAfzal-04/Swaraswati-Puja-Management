@@ -1,28 +1,50 @@
-import express from "express"
-import dotenv from "dotenv"
-import cors from "cors"
-import connectDB from "./config/db.js"
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import connectDB from "./config/db.js";
 
-import authRoutes from "./routes/authRoutes.js"
-import memberRoutes from "./routes/memberRoutes.js"
-import seedAdmin from "./utils/seedAdmin.js"
+import authRoutes from "./routes/authRoutes.js";
+import memberRoutes from "./routes/memberRoutes.js";
+import seedAdmin from "./utils/seedAdmin.js";
 
-dotenv.config()
-connectDB().then(seedAdmin)
+dotenv.config();
 
-const app = express()
+// Connect DB
+connectDB().then(seedAdmin);
 
-app.use(cors({
-  origin: "http://localhost:5173",
-  credentials: true
-}))
+const app = express();
 
-app.use(express.json())
+/* -------------------- CORS -------------------- */
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL, // 🔥 from env
+    credentials: true,
+  })
+);
 
-app.use("/api/auth", authRoutes)
-app.use("/api/members", memberRoutes)
+app.use(express.json());
 
-const PORT = process.env.PORT || 5000
-app.listen(PORT, () =>
-  console.log(`🚀 Server running on http://localhost:${PORT}`)
-)
+/* -------------------- ROOT ENDPOINT -------------------- */
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "API is running 🚀",
+  });
+});
+
+/* -------------------- ROUTES -------------------- */
+app.use("/api/auth", authRoutes);
+app.use("/api/members", memberRoutes);
+
+/* -------------------- LOCAL SERVER -------------------- */
+const PORT = process.env.PORT || 5000;
+
+// 🔥 Only listen locally (NOT on Vercel)
+if (process.env.NODE_ENV !== "production") {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+  });
+}
+
+// 🔥 REQUIRED for Vercel
+export default app;
