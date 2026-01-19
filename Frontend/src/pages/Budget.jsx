@@ -4,15 +4,22 @@ import ContributionTable from "../components/budget/ContributionTable"
 import BudgetGraphs from "../components/budget/BudgetGraphs"
 import AddIncomeModal from "../components/budget/AddIncomeModal"
 import AddExpenseModal from "../components/budget/AddExpenseModal"
-import { getSummary, getTransactions } from "../services/transactionApi"
+import {
+  getSummary,
+  getTransactions,
+} from "../services/transactionApi"
+import toast from "react-hot-toast"
 
 export default function Budget() {
   const [role, setRole] = useState(null)
   const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, balance: 0 })
   const [transactions, setTransactions] = useState([])
+  const [loading, setLoading] = useState(true)
   const [showIncome, setShowIncome] = useState(false)
   const [showExpense, setShowExpense] = useState(false)
   const [showGraphs, setShowGraphs] = useState(false)
+
+  const canEdit = role === "Admin" || role === "Manager"
 
   /* -------------------- LOAD ROLE -------------------- */
   useEffect(() => {
@@ -24,37 +31,57 @@ export default function Budget() {
   const fetchSummary = async () => {
     try {
       const data = await getSummary()
-      setSummary(data)
+      console.log("Fetched summary:", data)
+      if (data) setSummary(data)
     } catch (err) {
-      console.error("Failed to load summary:", err)
+      console.error("Failed to fetch summary:", err)
+      toast.error("Failed to load summary")
+    }
+  }
+
+  /* -------------------- FETCH TRANSACTIONS -------------------- */
+  const fetchTransactions = async () => {
+    try {
+      setLoading(true)
+      const data = await getTransactions()
+      if (data) {
+        // Map each transaction to displayName / displayPhone
+        const mapped = data.map(tx => ({
+          ...tx,
+          displayName:
+            tx.member?.name || tx.donor?.name || tx.name || "Anonymous",
+          displayPhone:
+            tx.member?.phone || tx.donor?.phoneNumber || tx.phoneNumber || "-",
+          amount: tx.amount,
+          paidAmount: tx.paidAmount,
+          paymentStatus: tx.paymentStatus,
+          type: tx.type,
+          para: tx.para,
+          pujaYear: tx.pujaYear,
+          addedBy: tx.addedBy,
+        }))
+        setTransactions(mapped)
+      }
+    } catch (err) {
+      console.error("Failed to fetch transactions:", err)
+      toast.error("Failed to load contributions")
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => {
     fetchSummary()
-  }, [])
-
-  /* -------------------- FETCH TRANSACTIONS -------------------- */
-  const fetchTransactions = async () => {
-    try {
-      const data = await getTransactions()
-      setTransactions(data)
-    } catch (err) {
-      console.error("Failed to load transactions:", err)
-    }
-  }
-
-  useEffect(() => {
     fetchTransactions()
   }, [])
 
-  const canEdit = role === "Admin" || role === "Manager"
+  const handleToggleAnalytics = () => setShowGraphs(prev => !prev)
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6 min-h-screen bg-orange-50">
       {/* ---------------- HEADER ---------------- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h1 className="text-3xl font-bold">💰 Budget</h1>
+        <h1 className="text-3xl font-bold text-orange-600">💰 Budget</h1>
 
         {/* ---------------- BUTTONS ---------------- */}
         {canEdit && (
@@ -72,10 +99,10 @@ export default function Budget() {
               + Add Expense
             </button>
             <button
-              onClick={() => setShowGraphs(!showGraphs)}
+              onClick={handleToggleAnalytics}
               className="px-4 py-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600 transition"
             >
-              {showGraphs ? "Hide Analytics" : "Show Analytics"}
+              {showGraphs ? "Show Data Table" : "Show Analytics"}
             </button>
           </div>
         )}
@@ -84,18 +111,18 @@ export default function Budget() {
       {/* ---------------- SUMMARY CARDS ---------------- */}
       <BudgetCards summary={summary} />
 
-      {/* ---------------- CONTRIBUTIONS TABLE ---------------- */}
-      <ContributionTable
-        data={transactions}
-        role={role}
-        fetchData={() => {
-          fetchTransactions()
-          fetchSummary()
-        }}
-      />
-
-      {/* ---------------- GRAPHS ---------------- */}
-      {showGraphs && (
+      {/* ---------------- CONDITIONAL RENDER ---------------- */}
+      {!showGraphs ? (
+        <ContributionTable
+          data={transactions}
+          role={role}
+          loading={loading}
+          fetchData={() => {
+            fetchTransactions()
+            fetchSummary()
+          }}
+        />
+      ) : (
         <div className="mt-6">
           <BudgetGraphs />
         </div>

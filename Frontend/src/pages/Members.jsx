@@ -9,12 +9,13 @@ const API_URL = import.meta.env.VITE_API_URL
 
 export default function Members() {
   const [members, setMembers] = useState([])
-  const [selected, setSelected] = useState(null)
+  const [selectedMember, setSelectedMember] = useState(null) // For viewing profile
+  const [editingMember, setEditingMember] = useState(null) // For add/edit form
   const [showForm, setShowForm] = useState(false)
   const [showLogin, setShowLogin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [deleteId, setDeleteId] = useState(null) // For confirmation modal
+  const [deleteId, setDeleteId] = useState(null)
 
   const userRole = localStorage.getItem("role")
   const canEdit = userRole === "Admin" || userRole === "Manager"
@@ -27,8 +28,10 @@ export default function Members() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || "Failed to fetch members")
       setMembers(data)
+      setError("")
     } catch (err) {
       setError(err.message)
+      setMembers([]) // Reset members if error occurs
       toast.error(err.message, { duration: 3000 })
     } finally {
       setLoading(false)
@@ -39,14 +42,20 @@ export default function Members() {
     fetchMembers()
   }, [])
 
+  /* ================= TOTAL MEMBER COLLECTION ================= */
+  const totalMemberCollection = members.reduce(
+    (sum, member) => sum + (member.contribution || 0),
+    0
+  )
+
   /* ================= ADD / EDIT ================= */
   const handleAddOrEdit = member => {
     if (!canEdit) {
-      setSelected(member)
+      setEditingMember(member)
       setShowLogin(true)
       return
     }
-    setSelected(member)
+    setEditingMember(member)
     setShowForm(true)
   }
 
@@ -66,7 +75,7 @@ export default function Members() {
         headers: { Authorization: `Bearer ${token}` }
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message)
+      if (!res.ok) throw new Error(data.message || "Failed to delete member")
 
       setMembers(prev => prev.filter(m => m._id !== deleteId))
       toast.success("Member deleted successfully ✅", { duration: 3000 })
@@ -77,48 +86,61 @@ export default function Members() {
     }
   }
 
-  /* ================= LOGIN SUCCESS ================= */
   const onLogin = role => {
     localStorage.setItem("role", role)
     setShowLogin(false)
-    if (selected !== null) setShowForm(true)
     toast.success(`Logged in as ${role}`, { duration: 3000 })
+    if (editingMember !== null) setShowForm(true)
   }
 
   return (
-    <section className="p-4 sm:p-8 space-y-6">
+    <section className="p-4 sm:p-8 space-y-6 bg-gradient-to-r from-orange-50 via-yellow-50 to-orange-50 min-h-screen">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-bold">👥 Member Management</h1>
+        <h1 className="text-4xl font-extrabold text-orange-600 drop-shadow-md">
+          👥 Member Management
+        </h1>
 
         <button
           onClick={() => handleAddOrEdit(null)}
-          className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded shadow-sm transition"
+          className="bg-orange-500 hover:bg-orange-600 hover:shadow-lg transition-all duration-200 text-white font-semibold px-5 py-2 rounded-xl shadow-md transform hover:-translate-y-1"
         >
           + Add Member
         </button>
       </div>
 
-      {loading && <p className="text-gray-500">Loading members...</p>}
-      {error && <p className="text-red-500">{error}</p>}
+      {/* ================= TOTAL MEMBER COLLECTION ================= */}
+      {!loading && members.length > 0 && (
+        <div className="bg-white p-4 rounded-xl shadow-md border border-orange-200 text-orange-700 font-semibold text-lg w-fit">
+          💰 Total Member Collection: ₹{totalMemberCollection.toLocaleString()}
+        </div>
+      )}
 
-      {!loading && (
-        <div className="overflow-x-auto">
+      {loading && <p className="text-gray-500 italic">Loading members...</p>}
+      {error && <p className="text-red-600 font-medium">{error}</p>}
+
+      {!loading && members.length > 0 && (
+        <div className="overflow-x-auto bg-white p-4 rounded-2xl shadow-lg border border-orange-200 hover:shadow-2xl transition-all duration-200
+          scrollbar-thin scrollbar-thumb-orange-400 scrollbar-track-orange-100 scrollbar-thumb-rounded-full scrollbar-track-rounded-full">
           <MemberTable
             members={members}
             currentUserRole={userRole}
-            onView={setSelected}
+            onView={setSelectedMember}
             onEdit={handleAddOrEdit}
             onDelete={id => setDeleteId(id)}
           />
         </div>
       )}
 
+      {!loading && members.length === 0 && (
+        <p className="text-gray-500 italic text-center">No members found</p>
+      )}
+
       {/* VIEW PROFILE */}
-      {selected && !showForm && (
+      {selectedMember && !showForm && (
         <MemberProfile
-          member={selected}
+          member={selectedMember}
           isAdmin={canEdit}
-          onClose={() => setSelected(null)}
+          onClose={() => setSelectedMember(null)}
         />
       )}
 
@@ -126,11 +148,11 @@ export default function Members() {
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <MemberForm
-            selected={selected}
+            selected={editingMember}
             onSuccess={fetchMembers}
             onClose={() => {
               setShowForm(false)
-              setSelected(null)
+              setEditingMember(null)
             }}
           />
         </div>
@@ -147,20 +169,20 @@ export default function Members() {
       {/* DELETE CONFIRMATION MODAL */}
       {deleteId && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
-          <div className="bg-white p-6 rounded-xl shadow-lg flex flex-col gap-4 max-w-xs w-full">
-            <p className="text-gray-700 text-center font-medium">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl flex flex-col gap-4 max-w-xs w-full border border-red-300">
+            <p className="text-red-700 text-center font-semibold">
               Are you sure you want to delete this member?
             </p>
             <div className="flex justify-center gap-4">
               <button
                 onClick={handleDelete}
-                className="bg-red-500 text-white px-4 py-2 rounded"
+                className="bg-red-500 hover:bg-red-600 hover:shadow-lg transition px-5 py-2 rounded-xl text-white font-semibold transform hover:-translate-y-1"
               >
                 Yes
               </button>
               <button
                 onClick={() => setDeleteId(null)}
-                className="bg-gray-300 px-4 py-2 rounded"
+                className="bg-gray-300 hover:bg-gray-400 hover:shadow-lg transition px-5 py-2 rounded-xl font-semibold transform hover:-translate-y-1"
               >
                 No
               </button>

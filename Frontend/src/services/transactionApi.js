@@ -42,3 +42,19 @@ export const getTopDonors = () => apiFetch("/transactions/graphs/top-donors")
 export const deleteTransaction = (id) => apiFetch(`/transactions/transaction/${id}`, {
   method: "DELETE"
 })
+/* =========================================================
+   ✏️ UPDATE INCOME
+========================================================= */
+export const updateIncome = (id, data) =>
+  apiFetch(`/transactions/income/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  })
+
+export const updateExpense = (id, data) =>
+  apiFetch(`/transactions/expense/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  })

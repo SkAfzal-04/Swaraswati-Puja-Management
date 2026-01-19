@@ -2,75 +2,53 @@ import express from "express"
 import {
   addIncome,
   addExpense,
+  updateIncome,
   markIncomeAsPaid,
+  deleteTransaction,
+  updateExpense,
+  deleteExpense,
   getTransactions,
   getSummary,
   paraWiseCollection,
   dayWiseCollection,
   incomeVsExpense,
-  topDonors,
-  deleteTransaction  // ✅ import the new controller
+  topDonors
 } from "../controllers/transactionController.js"
-
-import { protect } from "../middleware/authMiddleware.js"
-import { authorize } from "../middleware/roleMiddleware.js"
+import { protect } from "../middleware/authMiddleware.js" // if you have auth
 
 const router = express.Router()
 
 /* =========================================================
-   ➕ ADD TRANSACTIONS
-   - Admin / Manager only
-========================================================= */
-router.post(
-  "/income",
-  protect,
-  authorize("Admin", "Manager"),
-  addIncome
-)
-
-router.post(
-  "/expense",
-  protect,
-  authorize("Admin", "Manager"),
-  addExpense
-)
-
-/* =========================================================
-   🔄 MARK DUE INCOME AS PAID
-   - Admin / Manager only
-========================================================= */
-router.patch(
-  "/income/:id/pay",
-  protect,
-  authorize("Admin", "Manager"),
-  markIncomeAsPaid
-)
-
-/* =========================================================
-   🗑️ DELETE TRANSACTION
-   - Admin only
-========================================================= */
-router.delete(
-  "/transaction/:id",
-  protect,
-  authorize("Admin"), // only admin
-  deleteTransaction
-)
-
-/* =========================================================
-   💰 SUMMARY & DASHBOARD DATA
-   - Public access (no auth needed)
+   📊 GET
 ========================================================= */
 router.get("/summary", getSummary)
-router.get("/", getTransactions)
+router.get("/",  getTransactions)
+router.get("/graphs/para", protect, paraWiseCollection)
+router.get("/graphs/day", protect, dayWiseCollection)
+router.get("/graphs/income-expense", protect, incomeVsExpense)
+router.get("/graphs/top-donors", protect, topDonors)
 
 /* =========================================================
-   📊 GRAPHS / ANALYTICS
-   - Public access
+   ➕ ADD
 ========================================================= */
-router.get("/graphs/para", paraWiseCollection)
-router.get("/graphs/day", dayWiseCollection)
-router.get("/graphs/income-expense", incomeVsExpense)
-router.get("/graphs/top-donors", topDonors)
+router.post("/income", protect, addIncome)
+router.post("/expense", protect, addExpense)
+
+/* =========================================================
+   🔄 MARK INCOME AS PAID
+========================================================= */
+router.patch("/income/:id/pay", protect, markIncomeAsPaid)
+
+/* =========================================================
+   ✏️ UPDATE
+========================================================= */
+router.patch("/income/:id", protect, updateIncome)
+router.patch("/expense/:id", protect, updateExpense)  // <-- new
+
+/* =========================================================
+   🗑️ DELETE
+========================================================= */
+router.delete("/transaction/:id", protect, deleteTransaction)
+router.delete("/expense/:id", protect, deleteExpense)  // <-- new
 
 export default router

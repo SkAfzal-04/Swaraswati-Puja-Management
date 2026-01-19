@@ -28,7 +28,7 @@ export default function LoginModal({ onLogin, onClose }) {
       localStorage.setItem("token", data.token)
       localStorage.setItem("role", data.role)
 
-      onLogin(data.role)   // Admin / Manager
+      onLogin(data.role)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -37,23 +37,25 @@ export default function LoginModal({ onLogin, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-xl w-80 shadow-xl">
-        <h2 className="text-xl font-bold mb-4">Admin / Manager Login</h2>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-gradient-to-br from-orange-200 via-yellow-100 to-orange-50 p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-orange-300">
+        <h2 className="text-2xl font-extrabold mb-5 text-orange-600 text-center drop-shadow-md">
+          🔐 Admin / Manager Login
+        </h2>
 
         {error && (
-          <p className="text-red-500 text-sm mb-2 text-center">
+          <p className="text-red-600 text-sm mb-3 text-center font-medium animate-shake">
             {error}
           </p>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
             placeholder="User ID"
             value={userId}
             onChange={e => setUserId(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border border-orange-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-300 p-3 rounded-xl transition"
             required
           />
 
@@ -62,14 +64,14 @@ export default function LoginModal({ onLogin, onClose }) {
             placeholder="Password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border border-orange-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-300 p-3 rounded-xl transition"
             required
           />
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-orange-500 text-white py-2 rounded disabled:opacity-60"
+            className="w-full bg-orange-500 hover:bg-orange-600 hover:shadow-lg text-white py-3 rounded-xl font-semibold transition transform hover:-translate-y-1 disabled:opacity-60"
           >
             {loading ? "Logging in..." : "Login"}
           </button>
@@ -77,7 +79,7 @@ export default function LoginModal({ onLogin, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="w-full bg-gray-300 py-2 rounded"
+            className="w-full bg-gray-300 hover:bg-gray-400 hover:shadow-md py-3 rounded-xl font-semibold transition transform hover:-translate-y-1"
           >
             Cancel
           </button>

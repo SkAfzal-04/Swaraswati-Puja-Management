@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -7,11 +8,15 @@ export default function ChangePassword() {
   const [newPassword, setNewPassword] = useState("")
   const [msg, setMsg] = useState("")
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  const navigate = useNavigate() // React Router navigation
 
   const submit = async e => {
     e.preventDefault()
     setMsg("")
     setError("")
+    setLoading(true)
 
     try {
       const token = localStorage.getItem("token")
@@ -31,25 +36,32 @@ export default function ChangePassword() {
       setMsg("✅ Password updated successfully")
       setOldPassword("")
       setNewPassword("")
+
+      // Navigate to home after 2 seconds
+      setTimeout(() => navigate("/"), 2000)
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <div className="max-w-md mx-auto mt-10 bg-white p-6 rounded shadow">
-      <h2 className="text-2xl font-bold mb-4">Change Password</h2>
+    <div className="max-w-md mx-auto mt-16 p-6 rounded-2xl shadow-2xl bg-gradient-to-br from-orange-200 via-yellow-100 to-orange-50 border border-orange-300">
+      <h2 className="text-3xl font-extrabold mb-6 text-orange-600 text-center drop-shadow-md">
+        🔑 Change Password
+      </h2>
 
-      {msg && <p className="text-green-600">{msg}</p>}
-      {error && <p className="text-red-600">{error}</p>}
+      {msg && <p className="text-green-700 font-medium mb-3 text-center animate-fade">{msg}</p>}
+      {error && <p className="text-red-600 font-medium mb-3 text-center animate-shake">{error}</p>}
 
-      <form onSubmit={submit} className="space-y-3">
+      <form onSubmit={submit} className="space-y-4">
         <input
           type="password"
           placeholder="Old Password"
           value={oldPassword}
           onChange={e => setOldPassword(e.target.value)}
-          className="w-full border p-2 rounded"
+          className="w-full p-3 rounded-xl border border-orange-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-300 transition"
           required
         />
 
@@ -58,12 +70,25 @@ export default function ChangePassword() {
           placeholder="New Password"
           value={newPassword}
           onChange={e => setNewPassword(e.target.value)}
-          className="w-full border p-2 rounded"
+          className="w-full p-3 rounded-xl border border-orange-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-300 transition"
           required
         />
 
-        <button className="w-full bg-orange-500 text-white py-2 rounded">
-          Update Password
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-orange-500 hover:bg-orange-600 hover:shadow-lg text-white py-3 rounded-xl font-semibold transition transform hover:-translate-y-1 disabled:opacity-60"
+        >
+          {loading ? "Updating..." : "Update Password"}
+        </button>
+
+        {/* Close button */}
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="w-full mt-2 bg-gray-300 hover:bg-gray-400 hover:shadow-lg text-gray-800 py-3 rounded-xl font-semibold transition transform hover:-translate-y-1"
+        >
+          Close
         </button>
       </form>
     </div>

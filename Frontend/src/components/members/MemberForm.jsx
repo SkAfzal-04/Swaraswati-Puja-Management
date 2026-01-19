@@ -57,7 +57,6 @@ export default function MemberForm({ selected = null, onSuccess, onClose }) {
         contribution: member.contribution === "" ? null : Number(member.contribution)
       }
 
-      // Only include login info if role is Manager
       if (member.role !== "Manager") {
         delete payload.userId
         delete payload.password
@@ -76,12 +75,9 @@ export default function MemberForm({ selected = null, onSuccess, onClose }) {
       })
 
       const data = await res.json()
-
       if (!res.ok) throw new Error(data.message || "Something went wrong")
 
       toast.success(selected ? "Member updated successfully ✅" : "Member added successfully ✅", { duration: 3000 })
-
-      // Safe callback execution
       onSuccess && typeof onSuccess === "function" && onSuccess()
       onClose && typeof onClose === "function" && onClose()
     } catch (err) {
@@ -93,12 +89,12 @@ export default function MemberForm({ selected = null, onSuccess, onClose }) {
   }
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-xl">
-      <h3 className="text-xl font-bold mb-4 text-center">
+    <div className="bg-gradient-to-r from-orange-100 via-yellow-50 to-orange-50 p-6 rounded-2xl shadow-2xl w-full max-w-xl border border-orange-300">
+      <h3 className="text-2xl font-extrabold mb-5 text-center text-orange-600">
         {selected ? "Edit Member" : "Add Member"}
       </h3>
 
-      {error && <p className="text-red-500 text-center">{error}</p>}
+      {error && <p className="text-red-600 text-center mb-3 font-medium">{error}</p>}
 
       <form onSubmit={submit} className="grid grid-cols-2 gap-4">
         <input
@@ -107,7 +103,7 @@ export default function MemberForm({ selected = null, onSuccess, onClose }) {
           value={member.name}
           onChange={handleChange}
           required
-          className="border p-2 rounded"
+          className="border border-orange-300 focus:ring-2 focus:ring-orange-400 focus:outline-none px-3 py-2 rounded-lg shadow-sm"
         />
 
         <input
@@ -115,14 +111,14 @@ export default function MemberForm({ selected = null, onSuccess, onClose }) {
           placeholder="Position"
           value={member.position}
           onChange={handleChange}
-          className="border p-2 rounded"
+          className="border border-orange-300 focus:ring-2 focus:ring-orange-400 focus:outline-none px-3 py-2 rounded-lg shadow-sm"
         />
 
         <select
           name="role"
           value={member.role}
           onChange={handleChange}
-          className="border p-2 rounded"
+          className="border border-orange-300 focus:ring-2 focus:ring-orange-400 focus:outline-none px-3 py-2 rounded-lg shadow-sm bg-white"
         >
           <option>User</option>
           <option>Manager</option>
@@ -134,7 +130,7 @@ export default function MemberForm({ selected = null, onSuccess, onClose }) {
           placeholder="Phone"
           value={member.phone}
           onChange={handleChange}
-          className="border p-2 rounded"
+          className="border border-orange-300 focus:ring-2 focus:ring-orange-400 focus:outline-none px-3 py-2 rounded-lg shadow-sm"
         />
 
         <input
@@ -142,7 +138,7 @@ export default function MemberForm({ selected = null, onSuccess, onClose }) {
           placeholder="Aadhaar"
           value={member.aadhaar}
           onChange={handleChange}
-          className="border p-2 rounded"
+          className="border border-orange-300 focus:ring-2 focus:ring-orange-400 focus:outline-none px-3 py-2 rounded-lg shadow-sm"
         />
 
         <input
@@ -151,20 +147,20 @@ export default function MemberForm({ selected = null, onSuccess, onClose }) {
           placeholder="Contribution (optional)"
           value={member.contribution}
           onChange={handleChange}
-          className="border p-2 rounded"
+          className="border border-orange-300 focus:ring-2 focus:ring-orange-400 focus:outline-none px-3 py-2 rounded-lg shadow-sm"
         />
 
-        <label className="flex items-center gap-2 col-span-2">
+        <label className="flex items-center gap-2 col-span-2 text-orange-700 font-medium">
           <input
             type="checkbox"
             name="active"
             checked={member.active}
             onChange={handleChange}
+            className="accent-orange-500 w-5 h-5"
           />
           Active Member
         </label>
 
-        {/* Manager login fields */}
         {member.role === "Manager" && (
           <>
             <input
@@ -173,7 +169,7 @@ export default function MemberForm({ selected = null, onSuccess, onClose }) {
               value={member.userId}
               onChange={handleChange}
               required
-              className="border p-2 rounded"
+              className="border border-orange-300 focus:ring-2 focus:ring-orange-400 focus:outline-none px-3 py-2 rounded-lg shadow-sm"
             />
             <input
               type="password"
@@ -182,23 +178,23 @@ export default function MemberForm({ selected = null, onSuccess, onClose }) {
               value={member.password}
               onChange={handleChange}
               required
-              className="border p-2 rounded"
+              className="border border-orange-300 focus:ring-2 focus:ring-orange-400 focus:outline-none px-3 py-2 rounded-lg shadow-sm"
             />
           </>
         )}
 
-        <div className="col-span-2 flex justify-end gap-3">
+        <div className="col-span-2 flex justify-end gap-3 mt-2">
           <button
             type="button"
             onClick={() => onClose && typeof onClose === "function" && onClose()}
-            className="bg-gray-300 px-4 py-2 rounded"
+            className="bg-gray-300 hover:bg-gray-400 transition px-5 py-2 rounded-lg shadow"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="bg-orange-500 text-white px-4 py-2 rounded"
+            className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg shadow transition"
           >
             {loading ? "Saving..." : "Save"}
           </button>
