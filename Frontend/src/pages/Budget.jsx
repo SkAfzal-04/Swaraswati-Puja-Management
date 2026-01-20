@@ -4,11 +4,12 @@ import ContributionTable from "../components/budget/ContributionTable"
 import BudgetGraphs from "../components/budget/BudgetGraphs"
 import AddIncomeModal from "../components/budget/AddIncomeModal"
 import AddExpenseModal from "../components/budget/AddExpenseModal"
+import { useAuth } from "../context/AuthContext"
 import { getSummary, getTransactions, getExpenses, deleteTransaction, deleteExpense } from "../services/transactionApi"
 import toast from "react-hot-toast"
 
 export default function Budget() {
-  const [role, setRole] = useState(null)
+  const { role } = useAuth()
   const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, balance: 0 })
   const [transactions, setTransactions] = useState([])
   const [expenses, setExpenses] = useState([])
@@ -27,11 +28,6 @@ export default function Budget() {
 
   const canEdit = role === "Admin" || role === "Manager"
 
-  /* -------------------- LOAD ROLE -------------------- */
-  useEffect(() => {
-    const savedRole = localStorage.getItem("role")
-    setRole(savedRole)
-  }, [])
 
   /* -------------------- FETCH SUMMARY -------------------- */
   const fetchSummary = async () => {
@@ -139,10 +135,11 @@ export default function Budget() {
           expensesData={expenses}
           role={role}
           loading={loading}
-          fetchData={fetchTransactions}
+          refreshData={refreshData}
           setDeleteId={setDeleteId}
           setDeleteType={setDeleteType}
         />
+
       ) : (
         <div className="mt-6">
           <BudgetGraphs />

@@ -3,6 +3,7 @@ import MemberTable from "../components/members/MemberTable"
 import MemberForm from "../components/members/MemberForm"
 import MemberProfile from "../components/members/MemberProfile"
 import LoginModal from "../components/LoginModal"
+import { useAuth } from "../context/AuthContext"
 import toast from "react-hot-toast"
 
 const API_URL = import.meta.env.VITE_API_URL
@@ -17,8 +18,10 @@ export default function Members() {
   const [error, setError] = useState("")
   const [deleteId, setDeleteId] = useState(null)
 
-  const userRole = localStorage.getItem("role")
-  const canEdit = userRole === "Admin" || userRole === "Manager"
+ const { role, isAuthenticated,token } = useAuth()
+
+const canEdit = role === "Admin" || role === "Manager"
+
 
   /* ================= FETCH MEMBERS ================= */
   const fetchMembers = async () => {
@@ -69,7 +72,6 @@ export default function Members() {
     }
 
     try {
-      const token = localStorage.getItem("token")
       const res = await fetch(`${API_URL}/members/${deleteId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
@@ -86,12 +88,6 @@ export default function Members() {
     }
   }
 
-  const onLogin = role => {
-    localStorage.setItem("role", role)
-    setShowLogin(false)
-    toast.success(`Logged in as ${role}`, { duration: 3000 })
-    if (editingMember !== null) setShowForm(true)
-  }
 
   return (
     <section className="p-4 sm:p-8 space-y-6 bg-gradient-to-r from-orange-50 via-yellow-50 to-orange-50 min-h-screen">
@@ -123,7 +119,7 @@ export default function Members() {
           scrollbar-thin scrollbar-thumb-orange-400 scrollbar-track-orange-100 scrollbar-thumb-rounded-full scrollbar-track-rounded-full">
           <MemberTable
             members={members}
-            currentUserRole={userRole}
+            currentUserRole={role}
             onView={setSelectedMember}
             onEdit={handleAddOrEdit}
             onDelete={id => setDeleteId(id)}
@@ -149,21 +145,28 @@ export default function Members() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <MemberForm
             selected={editingMember}
-            onSuccess={fetchMembers}
+            onSuccess={() => {
+              fetchMembers()        // 🔥 refetch
+              setSelectedMember(null) // 🔥 clear stale profile
+            }}
             onClose={() => {
               setShowForm(false)
               setEditingMember(null)
             }}
           />
+
         </div>
       )}
 
       {/* LOGIN MODAL */}
       {showLogin && (
-        <LoginModal
-          onLogin={onLogin}
-          onClose={() => setShowLogin(false)}
-        />
+       <LoginModal
+  onClose={() => {
+    setShowLogin(false)
+    if (editingMember !== null) setShowForm(true)
+  }}
+/>
+
       )}
 
       {/* DELETE CONFIRMATION MODAL */}

@@ -228,17 +228,24 @@ export const getSummary = async (req, res) => {
 export const topDonors = async (req, res) => {
   try {
     const data = await Transaction.aggregate([
-      { 
-        $match: { type: { $in: ["Chanda", "Donation"] }, donor: { $ne: null }, paymentStatus: "Paid" } 
+      {
+        $match: {
+          type: "Donation",
+          donor: { $ne: null },
+          paidAmount: { $gt: 0 }
+        }
       },
       {
-        $group: { _id: "$donor", total: { $sum: "$paidAmount" } }
+        $group: {
+          _id: "$donor",
+          total: { $sum: "$paidAmount" }
+        }
       },
       { $sort: { total: -1 } },
       { $limit: 5 },
       {
         $lookup: {
-          from: "donors",        // donor collection
+          from: "donors",
           localField: "_id",
           foreignField: "_id",
           as: "donorInfo"
@@ -249,11 +256,11 @@ export const topDonors = async (req, res) => {
         $project: {
           _id: 0,
           name: "$donorInfo.name",
-          phoneNumber: "$donorInfo.phoneNumber",
           total: 1
         }
       }
     ])
+
     res.json(data)
   } catch (err) {
     res.status(500).json({ message: err.message })
@@ -267,11 +274,23 @@ export const donorByDate = async (req, res) => {
   try {
     const data = await Transaction.aggregate([
       {
-        $match: { type: { $in: ["Chanda", "Donation"] }, donor: { $ne: null }, paymentStatus: "Paid" }
+        $match: {
+          type: "Donation",
+          donor: { $ne: null },
+          paidAmount: { $gt: 0 }
+        }
       },
       {
         $group: {
-          _id: { donor: "$donor", date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } } },
+          _id: {
+            donor: "$donor",
+            date: {
+              $dateToString: {
+                format: "%Y-%m-%d",
+                date: "$paidDate"
+              }
+            }
+          },
           totalPaid: { $sum: "$paidAmount" }
         }
       },
@@ -288,18 +307,19 @@ export const donorByDate = async (req, res) => {
         $project: {
           _id: 0,
           name: "$donorInfo.name",
-          phoneNumber: "$donorInfo.phoneNumber",
           date: "$_id.date",
           totalPaid: 1
         }
       },
-      { $sort: { date: 1, totalPaid: -1 } }
+      { $sort: { date: 1 } }
     ])
+
     res.json(data)
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
 }
+
 
 /* =========================================================
    📈 EXPENSE BY DATE (line graph)
@@ -426,13 +446,22 @@ export const updateIncome = async (req, res) => {
 export const paraWiseCollection = async (req, res) => {
   try {
     const { pujaYear } = req.query
-    const match = { type: { $in: ["Chanda", "Donation", "Member Contribution"] } }
+
+    const match = {
+      type: { $in: ["Chanda", "Donation"] },
+      paidAmount: { $gt: 0 }
+    }
+
     if (pujaYear) match.pujaYear = Number(pujaYear)
-    match.paymentStatus = "Paid"
 
     const data = await Transaction.aggregate([
       { $match: match },
-      { $group: { _id: "$para", total: { $sum: "$paidAmount" } } },
+      {
+        $group: {
+          _id: "$para",
+          total: { $sum: "$paidAmount" }
+        }
+      },
       { $sort: { total: -1 } }
     ])
 
@@ -441,6 +470,7 @@ export const paraWiseCollection = async (req, res) => {
     res.status(500).json({ message: err.message })
   }
 }
+
 
 /* =========================================================
    📅 DAY-WISE COLLECTION

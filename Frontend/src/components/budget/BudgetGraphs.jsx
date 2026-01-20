@@ -48,7 +48,7 @@ export default function BudgetGraphs() {
           getDonorByDate(),
           getExpenseByDate(),
         ])
-
+        console.log(para, day, incomeVsExpense, topDonors, donorByDate, expense)
       setParaData(para)
       setDayData(day)
 

@@ -1,10 +1,12 @@
 import { Routes, Route } from "react-router-dom"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Toaster } from "react-hot-toast"
+
+import { useAuth } from "./context/AuthContext"
 
 import Navbar from "./components/Navbar"
 import LoginModal from "./components/LoginModal"
-import SplashScreen from "./components/SplashScreen" // 🔥 NEW
+import SplashScreen from "./components/SplashScreen"
 
 import Home from "./pages/Home"
 import Members from "./pages/Members"
@@ -12,37 +14,19 @@ import ChangePassword from "./pages/ChangePassword"
 import Budget from "./pages/Budget"
 
 export default function App() {
-  const [role, setRole] = useState(null)
+  const { role } = useAuth()
   const [showLogin, setShowLogin] = useState(false)
-  const [showSplash, setShowSplash] = useState(true) // 🔥 splash state
-
-  // 🔄 Restore login on refresh
-  useEffect(() => {
-    const savedRole = localStorage.getItem("role")
-    if (savedRole) setRole(savedRole)
-  }, [])
-
-  const handleLoginSuccess = role => {
-    setRole(role)
-    setShowLogin(false)
-  }
+  const [showSplash, setShowSplash] = useState(true)
 
   return (
     <>
-      {/* 🔥 TOASTER */}
       <Toaster position="top-right" />
 
-      {/* 🔥 SPLASH SCREEN */}
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
 
-      {/* 🔥 MAIN APP */}
       {!showSplash && (
         <>
-          <Navbar
-            role={role}
-            onLoginClick={() => setShowLogin(true)}
-            setRole={setRole}
-          />
+          <Navbar onLoginClick={() => setShowLogin(true)} />
 
           <Routes>
             <Route path="/" element={<Home />} />
@@ -51,12 +35,8 @@ export default function App() {
             <Route path="/budget" element={<Budget />} />
           </Routes>
 
-          {/* ✅ LOGIN MODAL */}
           {showLogin && (
-            <LoginModal
-              onLogin={handleLoginSuccess}
-              onClose={() => setShowLogin(false)}
-            />
+            <LoginModal onClose={() => setShowLogin(false)} />
           )}
         </>
       )}

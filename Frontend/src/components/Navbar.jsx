@@ -3,16 +3,17 @@ import { Link, useNavigate } from "react-router-dom"
 import { useState } from "react"
 import { Menu, X } from "lucide-react"
 import toast from "react-hot-toast"
+import { useAuth } from "../context/AuthContext" // ✅ use auth context
 
-export default function Navbar({ role, setRole, onLoginClick }) {
+export default function Navbar({ onLoginClick }) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
 
-  const logout = () => {
-    localStorage.removeItem("token")
-    localStorage.removeItem("role")
-    setRole(null)
+  // ✅ Get auth state from context
+  const { role, logout: contextLogout } = useAuth()
 
+  const logout = () => {
+    contextLogout() // call context logout
     toast.success("Logged out successfully 👋")
     navigate("/")
     setOpen(false)
@@ -82,7 +83,6 @@ export default function Navbar({ role, setRole, onLoginClick }) {
       className="sticky top-0 z-50 bg-gradient-to-r from-orange-500 via-yellow-400 to-orange-500 text-white shadow-xl"
     >
       <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-        
         {/* LOGO + TITLE */}
         <Link to="/" className="flex items-center gap-3">
           <img

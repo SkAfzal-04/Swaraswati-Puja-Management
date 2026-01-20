@@ -1,8 +1,10 @@
 import { useState } from "react"
+import { useAuth } from "../context/AuthContext" // ✅ ADD THIS
 
 const API_URL = import.meta.env.VITE_API_URL
 
-export default function LoginModal({ onLogin, onClose }) {
+export default function LoginModal({ onClose }) {
+  const { login } = useAuth() // ✅ CONTEXT LOGIN
   const [userId, setUserId] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
@@ -21,14 +23,15 @@ export default function LoginModal({ onLogin, onClose }) {
       })
 
       const data = await res.json()
-
       if (!res.ok) throw new Error(data.message || "Login failed")
 
-      // 🔐 Store auth data
-      localStorage.setItem("token", data.token)
-      localStorage.setItem("role", data.role)
+      // ✅ CENTRALIZED AUTH STATE
+      login({
+        role: data.role,
+        token: data.token
+      })
 
-      onLogin(data.role)
+      onClose() // close modal after success
     } catch (err) {
       setError(err.message)
     } finally {
@@ -44,7 +47,7 @@ export default function LoginModal({ onLogin, onClose }) {
         </h2>
 
         {error && (
-          <p className="text-red-600 text-sm mb-3 text-center font-medium animate-shake">
+          <p className="text-red-600 text-sm mb-3 text-center font-medium">
             {error}
           </p>
         )}
@@ -55,7 +58,7 @@ export default function LoginModal({ onLogin, onClose }) {
             placeholder="User ID"
             value={userId}
             onChange={e => setUserId(e.target.value)}
-            className="w-full border border-orange-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-300 p-3 rounded-xl transition"
+            className="w-full border border-orange-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-300 p-3 rounded-xl"
             required
           />
 
@@ -64,14 +67,14 @@ export default function LoginModal({ onLogin, onClose }) {
             placeholder="Password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            className="w-full border border-orange-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-300 p-3 rounded-xl transition"
+            className="w-full border border-orange-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-300 p-3 rounded-xl"
             required
           />
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-orange-500 hover:bg-orange-600 hover:shadow-lg text-white py-3 rounded-xl font-semibold transition transform hover:-translate-y-1 disabled:opacity-60"
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold transition disabled:opacity-60"
           >
             {loading ? "Logging in..." : "Login"}
           </button>
@@ -79,7 +82,7 @@ export default function LoginModal({ onLogin, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="w-full bg-gray-300 hover:bg-gray-400 hover:shadow-md py-3 rounded-xl font-semibold transition transform hover:-translate-y-1"
+            className="w-full bg-gray-300 hover:bg-gray-400 py-3 rounded-xl font-semibold transition"
           >
             Cancel
           </button>
