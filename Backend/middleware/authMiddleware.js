@@ -16,7 +16,6 @@ export const protect = (req, res, next) => {
       _id: decoded.id??decoded._id,
       role: decoded.role
     }
-    console.log("Authenticated user:", req.user)
 
     next()
   } catch (err) {
