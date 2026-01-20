@@ -13,9 +13,10 @@ export const protect = (req, res, next) => {
 
     // ✅ Normalize user object
     req.user = {
-      _id: decoded.id,
+      _id: decoded.id??decoded._id,
       role: decoded.role
     }
+    console.log("Authenticated user:", req.user)
 
     next()
   } catch (err) {

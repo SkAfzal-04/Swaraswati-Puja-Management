@@ -133,7 +133,7 @@ export const getTransactions = async (req, res) => {
       .populate("donor", "name phoneNumber")
       .populate("member", "name phone")
       .sort({ createdAt: -1 })
-      console.log("Fetched Transactions:", transactions)
+      //console.log("Fetched Transactions:", transactions)
 
     res.json(transactions)
   } catch (err) {
@@ -445,118 +445,190 @@ export const paraWiseCollection = async (req, res) => {
 /* =========================================================
    📅 DAY-WISE COLLECTION
 ========================================================= */
+
+
+
 export const dayWiseCollection = async (req, res) => {
   try {
-    const { pujaYear } = req.query
-    const match = { type: { $in: ["Chanda", "Donation", "Member Contribution"] } }
-    if (pujaYear) match.pujaYear = Number(pujaYear)
-    match.paymentStatus = "Paid"
+    const { pujaYear } = req.query;
 
-    const data = await Transaction.aggregate([
-      { $match: match },
+    /* ===============================
+       💰 TRANSACTIONS (REAL CASH ONLY)
+    =============================== */
+    const txnMatch = {
+      type: { $in: ["Chanda", "Donation"] },
+      paidDate: { $ne: null },
+      paidAmount: { $gt: 0 }
+    };
+
+    if (pujaYear) txnMatch.pujaYear = Number(pujaYear);
+
+    const txnData = await Transaction.aggregate([
+      { $match: txnMatch },
       {
         $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$paidDate" } },
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$paidDate"
+            }
+          },
           total: { $sum: "$paidAmount" }
         }
-      },
-      { $sort: { _id: 1 } }
-    ])
+      }
+    ]);
 
-    res.json(data)
+    /* ===============================
+       👥 MEMBER CONTRIBUTIONS
+       (COUNTED ON JOINING DATE)
+    =============================== */
+    const memberMatch = {
+      active: true,
+      contribution: { $gt: 0 }
+    };
+
+    if (pujaYear) {
+      memberMatch.joiningDate = {
+        $gte: new Date(`${pujaYear}-01-01`),
+        $lte: new Date(`${pujaYear}-12-31`)
+      };
+    }
+
+    const memberData = await Member.aggregate([
+      { $match: memberMatch },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$joiningDate"
+            }
+          },
+          total: { $sum: "$contribution" }
+        }
+      }
+    ]);
+
+    /* ===============================
+       🔀 MERGE BOTH SOURCES BY DATE
+    =============================== */
+    const incomeMap = {};
+
+    txnData.forEach(d => {
+      incomeMap[d._id] = (incomeMap[d._id] || 0) + d.total;
+    });
+
+    memberData.forEach(d => {
+      incomeMap[d._id] = (incomeMap[d._id] || 0) + d.total;
+    });
+
+    const result = Object.keys(incomeMap)
+      .sort()
+      .map(date => ({
+        date,
+        total: incomeMap[date]
+      }));
+
+    res.json(result);
   } catch (err) {
-    res.status(500).json({ message: err.message })
+    console.error("Day Wise Collection Error:", err);
+    res.status(500).json({ message: err.message });
   }
-}
+};
+
 
 /* =========================================================
    📈 INCOME VS EXPENSE
 ========================================================= */
+
+
 export const incomeVsExpense = async (req, res) => {
   try {
     const { pujaYear } = req.query;
 
-    // -------------------- TRANSACTIONS --------------------
-    const matchIncome = {
-      type: { $in: ["Chanda", "Donation"] }
+    /* ===============================
+       💰 TRANSACTION INCOME (REAL CASH)
+    =============================== */
+    const txnMatch = {
+      type: { $in: ["Chanda", "Donation"] },
+      paidDate: { $ne: null },
+      paidAmount: { $gt: 0 }
     };
-    if (pujaYear) matchIncome.pujaYear = Number(pujaYear);
 
-    // Sum of paid transactions
-    const txnPaid = await Transaction.aggregate([
-      { $match: { ...matchIncome, paymentStatus: "Paid" } },
+    if (pujaYear) txnMatch.pujaYear = Number(pujaYear);
+
+    const txnIncome = await Transaction.aggregate([
+      { $match: txnMatch },
       {
         $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$paidDate" } },
-          totalPaid: { $sum: "$paidAmount" }
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$paidDate" }
+          },
+          total: { $sum: "$paidAmount" }
         }
-      },
-      { $sort: { "_id": 1 } },
+      }
     ]);
 
-    // Sum of due transactions
-    const txnDue = await Transaction.aggregate([
-      { $match: { ...matchIncome, paymentStatus: "Due" } },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$paidDate" } },
-          totalDue: { $sum: { $subtract: ["$amount", "$paidAmount"] } }
-        }
-      },
-    ]);
+    /* ===============================
+       👥 MEMBER CONTRIBUTIONS
+       (ONE-TIME ON JOINING DATE)
+    =============================== */
+    const memberMatch = {
+      active: true,
+      contribution: { $gt: 0 }
+    };
 
-    // -------------------- MEMBER CONTRIBUTIONS --------------------
-    const memberMatch = { active: true };
     if (pujaYear) {
-      const start = new Date(`${pujaYear}-01-01`);
-      const end = new Date(`${pujaYear}-12-31`);
-      memberMatch.joiningDate = { $lte: end };
+      memberMatch.joiningDate = {
+        $gte: new Date(`${pujaYear}-01-01`),
+        $lte: new Date(`${pujaYear}-12-31`)
+      };
     }
 
-    const members = await Member.find(memberMatch).select("contribution joiningDate");
-
-    const memberIncome = members
-      .filter((m) => m.contribution && m.contribution > 0)
-      .map((m) => ({
-        _id: m.joiningDate.toISOString().slice(0, 10),
-        total: m.contribution
-      }));
-
-    // -------------------- MERGE INCOME BY DATE --------------------
-    const incomeMap = {};
-
-    // Paid transactions
-    txnPaid.forEach(d => {
-      if (!incomeMap[d._id]) incomeMap[d._id] = 0;
-      incomeMap[d._id] += d.totalPaid;
-    });
-
-    // Member contributions
-    memberIncome.forEach(d => {
-      if (!incomeMap[d._id]) incomeMap[d._id] = 0;
-      incomeMap[d._id] += d.total;
-    });
-
-    // Deduct unpaid dues
-    txnDue.forEach(d => {
-      if (!incomeMap[d._id]) incomeMap[d._id] = 0;
-      incomeMap[d._id] -= d.totalDue;
-      if (incomeMap[d._id] < 0) incomeMap[d._id] = 0; // avoid negative
-    });
-
-    // -------------------- EXPENSES --------------------
-    const matchExpense = {};
-    if (pujaYear) matchExpense.pujaYear = Number(pujaYear);
-
-    const expenseData = await Expense.aggregate([
-      { $match: matchExpense },
+    const memberIncome = await Member.aggregate([
+      { $match: memberMatch },
       {
         $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$paidDate" } },
-          total: { $sum: "$amount" },
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$joiningDate"
+            }
+          },
+          total: { $sum: "$contribution" }
         }
-      },
-      { $sort: { "_id": 1 } },
+      }
+    ]);
+
+    /* ===============================
+       🔀 MERGE TOTAL INCOME BY DATE
+    =============================== */
+    const incomeMap = {};
+
+    txnIncome.forEach(d => {
+      incomeMap[d._id] = (incomeMap[d._id] || 0) + d.total;
+    });
+
+    memberIncome.forEach(d => {
+      incomeMap[d._id] = (incomeMap[d._id] || 0) + d.total;
+    });
+
+    /* ===============================
+       💸 EXPENSES (REAL CASH OUT)
+    =============================== */
+    const expenseMatch = {};
+    if (pujaYear) expenseMatch.pujaYear = Number(pujaYear);
+
+    const expenseData = await Expense.aggregate([
+      { $match: expenseMatch },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$paidDate" }
+          },
+          total: { $sum: "$amount" }
+        }
+      }
     ]);
 
     const expenseMap = {};
@@ -564,23 +636,26 @@ export const incomeVsExpense = async (req, res) => {
       expenseMap[d._id] = d.total;
     });
 
-    // -------------------- COMBINE ALL DATES --------------------
+    /* ===============================
+       📊 FINAL MERGED RESPONSE
+    =============================== */
     const allDates = Array.from(
       new Set([...Object.keys(incomeMap), ...Object.keys(expenseMap)])
     ).sort();
 
-    const combined = allDates.map(date => ({
+    const result = allDates.map(date => ({
       date,
       income: incomeMap[date] || 0,
-      expense: expenseMap[date] || 0,
+      expense: expenseMap[date] || 0
     }));
 
-    res.json(combined);
+    res.json(result);
   } catch (err) {
-    console.error("Income vs Expense by Date Error:", err);
+    console.error("Income vs Expense Error:", err);
     res.status(500).json({ message: err.message });
   }
 };
+
 
 
 
@@ -620,7 +695,7 @@ export const getExpenses = async (req, res) => {
     const expenses = await Expense.find(filter)
       .populate("addedBy", "name role")
       .sort({ createdAt: -1 })
-    console.log("Fetched Expenses:", expenses)
+    //console.log("Fetched Expenses:", expenses)
 
     res.json(expenses)
   } catch (err) {

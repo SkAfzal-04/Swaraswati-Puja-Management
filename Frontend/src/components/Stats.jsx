@@ -1,11 +1,38 @@
-import { motion } from "framer-motion"
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { fetchStats } from "../services/memberService";
 
 export default function Stats() {
-  const stats = [
-    { label: "Members", value: "120+" },
-    { label: "Total Donation", value: "₹2.5L+" },
-    { label: "Paras Covered", value: "15+" }
-  ]
+  const [stats, setStats] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const data = await fetchStats();
+
+        setStats([
+          { label: "Members", value: `${data.members}+` },
+          { label: "Total Collection", value: `₹${formatAmount(data.totalDonation)}+` },
+          { label: "Paras Covered", value: `${data.parasCovered}+` }
+        ]);
+      } catch (err) {
+        console.error("Failed to load stats", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStats();
+  }, []);
+
+  if (loading) {
+    return (
+      <section className="py-20 bg-white text-center text-gray-500">
+        Loading statistics...
+      </section>
+    );
+  }
 
   return (
     <section className="py-20 bg-white">
@@ -27,5 +54,13 @@ export default function Stats() {
         ))}
       </div>
     </section>
-  )
+  );
+}
+
+// ---------- Helper ----------
+function formatAmount(amount) {
+  if (!amount) return "0";
+  if (amount >= 100000) return `${(amount / 100000).toFixed(1)}L`;
+  if (amount >= 1000) return `${(amount / 1000).toFixed(1)}K`;
+  return amount.toString();
 }

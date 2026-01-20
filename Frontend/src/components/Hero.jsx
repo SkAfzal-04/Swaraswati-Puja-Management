@@ -23,7 +23,7 @@ export default function Hero() {
           transition={{ duration: 0.8 }}
           className="text-4xl md:text-6xl font-extrabold text-orange-700"
         >
-          🙏 Saraswati Puja Management
+          🙏 Panchra Saraswati Puja 
         </motion.h2>
 
         <motion.p

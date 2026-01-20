@@ -26,8 +26,9 @@ export const login = async (req, res) => {
 }
 // CHANGE PASSWORD
 export const changePassword = async (req, res) => {
+  console.log("Change Password Request by User ID:", req.user.id);
   try {
-    const userId = req.user.id // from protect middleware
+    const userId = req.user._id // from protect middleware
     const { oldPassword, newPassword } = req.body
 
     if (!oldPassword || !newPassword) {
@@ -35,11 +36,12 @@ export const changePassword = async (req, res) => {
     }
 
     const user = await User.findById(userId)
+    console.log("Fetched User for Password Change:", user);
     if (!user) return res.status(404).json({ message: "User not found" })
 
     const isMatch = await bcrypt.compare(oldPassword, user.password)
     if (!isMatch) return res.status(401).json({ message: "Old password is incorrect" })
-
+    user.password = newPassword
     await user.save()
 
     res.json({ message: "Password updated successfully" })

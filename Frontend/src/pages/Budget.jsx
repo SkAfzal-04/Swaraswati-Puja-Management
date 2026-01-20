@@ -4,7 +4,7 @@ import ContributionTable from "../components/budget/ContributionTable"
 import BudgetGraphs from "../components/budget/BudgetGraphs"
 import AddIncomeModal from "../components/budget/AddIncomeModal"
 import AddExpenseModal from "../components/budget/AddExpenseModal"
-import { getSummary, getTransactions, getExpenses } from "../services/transactionApi"
+import { getSummary, getTransactions, getExpenses, deleteTransaction, deleteExpense } from "../services/transactionApi"
 import toast from "react-hot-toast"
 
 export default function Budget() {
@@ -16,6 +16,14 @@ export default function Budget() {
   const [showIncome, setShowIncome] = useState(false)
   const [showExpense, setShowExpense] = useState(false)
   const [showGraphs, setShowGraphs] = useState(false)
+
+  // -------------------- REFRESH FUNCTION --------------------
+  const refreshData = async () => {
+    await Promise.all([fetchSummary(), fetchTransactions()])
+  }
+
+  const [deleteId, setDeleteId] = useState(null)
+  const [deleteType, setDeleteType] = useState("transaction") // "transaction" or "expense"
 
   const canEdit = role === "Admin" || role === "Manager"
 
@@ -41,9 +49,8 @@ export default function Budget() {
     try {
       setLoading(true)
       const txData = await getTransactions()
-      const expData = await getExpenses() // <-- fetch expenses
+      const expData = await getExpenses()
 
-      // Map transactions for display
       const mappedTx = (txData || []).map(tx => ({
         ...tx,
         displayName: tx.member?.name || tx.donor?.name || tx.name || "Anonymous",
@@ -58,7 +65,7 @@ export default function Budget() {
       }))
 
       setTransactions(mappedTx)
-      setExpenses(expData || []) // <-- set expenses state
+      setExpenses(expData || [])
     } catch (err) {
       console.error("Failed to fetch data:", err)
       toast.error("Failed to load contributions or expenses")
@@ -74,13 +81,30 @@ export default function Budget() {
 
   const handleToggleAnalytics = () => setShowGraphs(prev => !prev)
 
+  /* -------------------- DELETE HANDLER -------------------- */
+  const handleDelete = async () => {
+    if (!deleteId) return
+
+    try {
+      if (deleteType === "expense") await deleteExpense(deleteId)
+      else await deleteTransaction(deleteId)
+
+      toast.success("Deleted successfully")
+      refreshData()
+    } catch (err) {
+      console.error("Delete failed:", err)
+      toast.error("Failed to delete")
+    } finally {
+      setDeleteId(null)
+    }
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-6 min-h-screen bg-orange-50">
       {/* ---------------- HEADER ---------------- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold text-orange-600">💰 Budget</h1>
 
-        {/* ---------------- BUTTONS ---------------- */}
         {canEdit && (
           <div className="flex flex-wrap gap-3">
             <button
@@ -112,13 +136,12 @@ export default function Budget() {
       {!showGraphs ? (
         <ContributionTable
           data={transactions}
-          expensesData={expenses} // <-- pass expenses as prop
+          expensesData={expenses}
           role={role}
           loading={loading}
-          fetchData={() => {
-            fetchTransactions()
-            fetchSummary()
-          }}
+          fetchData={fetchTransactions}
+          setDeleteId={setDeleteId}
+          setDeleteType={setDeleteType}
         />
       ) : (
         <div className="mt-6">
@@ -131,8 +154,7 @@ export default function Budget() {
         <AddIncomeModal
           onClose={() => {
             setShowIncome(false)
-            fetchSummary()
-            fetchTransactions()
+            refreshData()
           }}
         />
       )}
@@ -140,10 +162,34 @@ export default function Budget() {
         <AddExpenseModal
           onClose={() => {
             setShowExpense(false)
-            fetchSummary()
-            fetchTransactions()
+            refreshData()
           }}
         />
+      )}
+
+      {/* ---------------- DELETE CONFIRMATION MODAL ---------------- */}
+      {deleteId && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl flex flex-col gap-4 max-w-xs w-full border border-red-300">
+            <p className="text-red-700 text-center font-semibold">
+              Are you sure you want to delete this {deleteType === "expense" ? "expense" : "contribution"}?
+            </p>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={handleDelete}
+                className="bg-red-500 hover:bg-red-600 hover:shadow-lg transition px-5 py-2 rounded-xl text-white font-semibold transform hover:-translate-y-1"
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => setDeleteId(null)}
+                className="bg-gray-300 hover:bg-gray-400 hover:shadow-lg transition px-5 py-2 rounded-xl font-semibold transform hover:-translate-y-1"
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

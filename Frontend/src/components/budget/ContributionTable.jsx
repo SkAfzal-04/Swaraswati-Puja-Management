@@ -3,7 +3,7 @@ import { deleteTransaction, deleteExpense } from "../../services/transactionApi"
 import AddIncomeModal from "../budget/AddIncomeModal"
 import AddExpenseModal from "../budget/AddExpenseModal"
 
-export default function ContributionTable({ data = [], expensesData = [], role, fetchData }) {
+export default function ContributionTable({ data = [], expensesData = [], role, fetchData,setDeleteId,setDeleteType }) {
   const [editData, setEditData] = useState(null)
   const [showExpense, setShowExpense] = useState(false)
 
@@ -24,16 +24,12 @@ export default function ContributionTable({ data = [], expensesData = [], role, 
     "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
 
   // ===================== Delete Handler =====================
-  const handleDelete = async (record, isExpense = false) => {
-    if (!window.confirm("Are you sure you want to delete this record?")) return
-    try {
-      if (isExpense) await deleteExpense(record._id)
-      else await deleteTransaction(record._id)
-      fetchData?.()
-    } catch (err) {
-      console.error("Delete failed:", err)
-    }
+  const handleDelete = (record, isExpense = false) => {
+    // Instead of window.confirm, trigger the modal in parent
+    setDeleteId(record._id)
+    setDeleteType(isExpense ? "expense" : "transaction")
   }
+
 
   // ===================== Filter + Sort =====================
   const filteredIncomes = useMemo(() => {

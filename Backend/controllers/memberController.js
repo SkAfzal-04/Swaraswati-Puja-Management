@@ -2,6 +2,8 @@ import Member from "../models/Member.js"
 import User from "../models/User.js"
 import bcrypt from "bcryptjs"
 import mongoose from "mongoose"
+import Transaction from "../models/Transaction.js";
+
 
 // ➕ Add Member
 export const addMember = async (req, res) => {
@@ -111,3 +113,74 @@ export const deleteMember = async (req, res) => {
     return res.status(500).json({ message: err.message })
   }
 }
+
+
+
+export const getStats = async (req, res) => {
+  try {
+    /* ===============================
+       👥 TOTAL MEMBERS
+    =============================== */
+    const totalMembers = await Member.countDocuments({ active: true });
+
+    /* ===============================
+       💰 TRANSACTION COLLECTION (PAID)
+    =============================== */
+    const incomeTypes = ["Chanda", "Donation", "Member Contribution"];
+
+    const incomeAgg = await Transaction.aggregate([
+      {
+        $match: {
+          type: { $in: incomeTypes }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          actualCollectionTx: { $sum: { $ifNull: ["$paidAmount", 0] } }
+        }
+      }
+    ]);
+
+    const actualCollectionTx = incomeAgg[0]?.actualCollectionTx || 0;
+
+    /* ===============================
+       🧾 MEMBER CONTRIBUTIONS
+    =============================== */
+    const members = await Member.find({ active: true }).select("contribution");
+
+    const totalMemberContribution = members.reduce(
+      (sum, m) => sum + (m.contribution || 0),
+      0
+    );
+
+    /* ===============================
+       📍 PARAS COVERED
+    =============================== */
+    const parasAgg = await Transaction.aggregate([
+      {
+        $match: {
+          type: { $in: incomeTypes },
+          para: { $ne: "" }
+        }
+      },
+      { $group: { _id: "$para" } }
+    ]);
+
+    const parasCovered = parasAgg.length;
+
+    /* ===============================
+       🧮 FINAL TOTAL COLLECTION
+    =============================== */
+    const totalCollection = actualCollectionTx + totalMemberContribution;
+
+    res.json({
+      members: totalMembers,
+      totalDonation: totalCollection, // 🔥 FIXED
+      parasCovered
+    });
+  } catch (err) {
+    console.error("Stats Fetch Error:", err);
+    res.status(500).json({ message: err.message });
+  }
+};

@@ -19,60 +19,54 @@ export default function Navbar({ role, setRole, onLoginClick }) {
   }
 
   const baseBtn =
-    "px-3 py-1 rounded-md text-sm font-semibold transition hover:opacity-90"
+    "px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200"
 
   const NavLinks = ({ mobile = false }) => (
     <div
       className={`${
-        mobile
-          ? "flex flex-col gap-3"
-          : "flex items-center gap-4"
+        mobile ? "flex flex-col gap-4" : "flex items-center gap-4"
       }`}
     >
-      {/* Members */}
       <Link
         to="/members"
         onClick={() => setOpen(false)}
-        className={`${baseBtn} bg-white text-orange-600`}
+        className={`${baseBtn} text-white hover:bg-white/20`}
       >
         Members
       </Link>
 
-      {/* Budget */}
       <Link
         to="/budget"
         onClick={() => setOpen(false)}
-        className={`${baseBtn} bg-white text-orange-600`}
+        className={`${baseBtn} text-white hover:bg-white/20`}
       >
         Budget
       </Link>
 
-      {/* Change Password */}
       {(role === "Admin" || role === "Manager") && (
         <Link
           to="/change-password"
           onClick={() => setOpen(false)}
-          className={`${baseBtn} bg-black text-white px-2 py-1 text-xs`}
+          className={`${baseBtn} bg-black/80 text-white hover:bg-black`}
         >
           Change Password
         </Link>
       )}
 
-      {/* Login / Logout */}
       {!role ? (
         <button
           onClick={() => {
             onLoginClick()
             setOpen(false)
           }}
-          className={`${baseBtn} bg-black text-white px-2 py-1 text-xs`}
+          className={`${baseBtn} bg-black/80 text-white hover:bg-black`}
         >
           Login
         </button>
       ) : (
         <button
           onClick={logout}
-          className={`${baseBtn} bg-red-600 text-white px-2 py-1 text-xs`}
+          className={`${baseBtn} bg-red-600/90 text-white hover:bg-red-600`}
         >
           Logout
         </button>
@@ -87,26 +81,35 @@ export default function Navbar({ role, setRole, onLoginClick }) {
       transition={{ duration: 0.6, ease: "easeOut" }}
       className="sticky top-0 z-50 bg-gradient-to-r from-orange-500 via-yellow-400 to-orange-500 text-white shadow-xl"
     >
-      <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-        <Link to="/" className="text-xl sm:text-2xl font-extrabold">
-          🎓 Saraswati Puja Club
+      <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+        
+        {/* LOGO + TITLE */}
+        <Link to="/" className="flex items-center gap-3">
+          <img
+            src="/logo.png"
+            alt="Saraswati Puja Logo"
+            className="h-10 w-auto object-contain rounded-full"
+          />
+          <span className="text-lg sm:text-2xl font-extrabold tracking-wide">
+            Panchra Saraswati Puja
+          </span>
         </Link>
 
-        {/* Desktop */}
+        {/* Desktop Menu */}
         <div className="hidden md:block">
           <NavLinks />
         </div>
 
-        {/* Mobile toggle */}
+        {/* Mobile Toggle */}
         <button
           onClick={() => setOpen(!open)}
-          className="md:hidden"
+          className="md:hidden text-white"
         >
           {open ? <X size={26} /> : <Menu size={26} />}
         </button>
       </div>
 
-      {/* Mobile Menu (60% height) */}
+      {/* Mobile Menu */}
       <AnimatePresence>
         {open && (
           <motion.div

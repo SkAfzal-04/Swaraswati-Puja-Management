@@ -117,17 +117,32 @@ export default function BudgetGraphs() {
       {/* DAY-WISE COLLECTION */}
       <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition-shadow">
         <h3 className="font-semibold mb-4 text-gray-700">Day-wise Collection</h3>
+
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={dayData}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="_id" stroke="#4b5563" />
+
+            {/* 🔥 FIX HERE */}
+            <XAxis dataKey="date" stroke="#4b5563" />
             <YAxis stroke="#4b5563" />
             <Tooltip />
-            <Line type="monotone" dataKey="total" stroke="#10b981" strokeWidth={2} />
-            {dayData.length > 5 && <Brush dataKey="_id" height={30} stroke="#10b981" />}
+
+            <Line
+              type="monotone"
+              dataKey="total"
+              stroke="#10b981"
+              strokeWidth={2}
+              dot={{ r: 4 }}     
+              activeDot={{ r: 6 }}
+            />
+
+            {dayData.length > 5 && (
+              <Brush dataKey="date" height={30} stroke="#10b981" />
+            )}
           </LineChart>
         </ResponsiveContainer>
       </div>
+
 
       {/* INCOME VS EXPENSE BY DATE */}
       <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition-shadow">

@@ -19,3 +19,5 @@ export const deleteMember = (id) =>
   apiFetch(`/members/${id}`, {
     method: "DELETE"
   })
+
+export const fetchStats = () => apiFetch("/members/stats");
