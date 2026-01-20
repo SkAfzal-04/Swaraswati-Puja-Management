@@ -19,7 +19,7 @@ export default function SplashScreen({ onFinish }) {
       onAnimationComplete={() => startExit && onFinish()}
     >
       <motion.img
-        src="/logo.png"
+        src="/logo.jpg"
         alt="Swaraswati Puja Logo"
         className="rounded-full object-cover shadow-[0_0_20px_rgba(255,165,0,0.7)]"
         initial={{

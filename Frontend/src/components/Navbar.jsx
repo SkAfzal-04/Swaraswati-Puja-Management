@@ -86,12 +86,12 @@ export default function Navbar({ onLoginClick }) {
         {/* LOGO + TITLE */}
         <Link to="/" className="flex items-center gap-3">
           <img
-            src="/logo.png"
+            src="/logo.jpg"
             alt="Saraswati Puja Logo"
             className="h-10 w-auto object-contain rounded-full"
           />
           <span className="text-lg sm:text-2xl font-extrabold tracking-wide">
-            Panchra Saraswati Puja
+            Panchra Agragami Sangha
           </span>
         </Link>
 
