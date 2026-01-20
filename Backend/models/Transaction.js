@@ -19,14 +19,10 @@ const transactionSchema = new mongoose.Schema(
     // Public Chanda or Donation info (if not a member/donor)
     name: {
       type: String,
-      default: "" // optional for Chanda by public
-    },
-    phoneNumber: {
-      type: String,
-      default: "" // optional for Chanda by public
+      default: "" // optional
     },
 
-    // Para (used for Chanda and Donations)
+    // Para (used for Chanda and Donations) — optional, can be blank
     para: {
       type: String,
       default: ""
@@ -38,7 +34,7 @@ const transactionSchema = new mongoose.Schema(
       required: true
     },
 
-    // Amount actually received (can be less than amount)
+    // Amount actually received
     paidAmount: {
       type: Number,
       default: 0
@@ -98,7 +94,6 @@ const transactionSchema = new mongoose.Schema(
 /* ======= Virtual field for display ======= */
 transactionSchema.virtual("displayName").get(function () {
   if (this.type === "Chanda") {
-    // Prefer member name, else fallback to public name
     return this.member?.name || this.name || "Anonymous"
   }
   if (this.type === "Donation") {
@@ -107,12 +102,13 @@ transactionSchema.virtual("displayName").get(function () {
   return ""
 })
 
+// Removed phone virtual because phoneNumber is no longer used
 transactionSchema.virtual("displayPhone").get(function () {
   if (this.type === "Chanda") {
-    return this.member?.phone || this.phoneNumber || "-"
+    return this.member?.phone || "-"
   }
   if (this.type === "Donation") {
-    return this.donor?.phoneNumber || this.member?.phone || this.phoneNumber || "-"
+    return this.donor?.phoneNumber || this.member?.phone || "-"
   }
   return "-"
 })

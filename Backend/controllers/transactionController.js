@@ -12,16 +12,15 @@ export const addIncome = async (req, res) => {
   try {
     const {
       name,
-      phoneNumber,
       memberId,
       amount,
       paidAmount = 0,
       type,
       pujaYear,
-      para
+      para = ""
     } = req.body
 
-    if (!amount || !pujaYear || !para) {
+    if (!amount || !pujaYear) {
       return res.status(400).json({ message: "Required fields missing" })
     }
 
@@ -29,33 +28,22 @@ export const addIncome = async (req, res) => {
     let donor = null
     let finalType = type
     let txnName = name || ""
-    let txnPhone = phoneNumber || ""
 
     /* ---------------- MEMBER ---------------- */
     if (memberId) {
       member = await Member.findById(memberId)
-      if (!member) {
-        return res.status(404).json({ message: "Member not found" })
-      }
+      if (!member) return res.status(404).json({ message: "Member not found" })
 
       finalType = "Member Contribution"
       txnName = member.name
-      txnPhone = member.phone || ""
     }
 
     /* ---------------- DONOR ---------------- */
     else if (type === "Donation") {
-      if (!name && !phoneNumber) {
-        return res.status(400).json({ message: "Donor info required" })
-      }
+      if (!name) return res.status(400).json({ message: "Donor name required" })
 
-      donor = await Donor.create({
-        name: name || "Anonymous",
-        phoneNumber: phoneNumber || ""
-      })
-
+      donor = await Donor.create({ name: name || "Anonymous" })
       txnName = donor.name
-      txnPhone = donor.phoneNumber
     }
 
     const paid = Number(paidAmount)
@@ -65,22 +53,18 @@ export const addIncome = async (req, res) => {
       member: member?._id || null,
       donor: donor?._id || null,
       name: txnName,
-      phoneNumber: txnPhone,
       para,
       amount: total,
       paidAmount: paid,
       paymentStatus: paid >= total ? "Paid" : "Due",
       paidDate: paid > 0 ? new Date() : null,
       type: finalType,
-      addedBy: req.user._id,   // ✅ FIXED
+      addedBy: req.user._id,
       pujaYear: Number(pujaYear)
     })
 
-    /* ---- update member contribution ONLY if paid ---- */
     if (member && paid > 0) {
-      await Member.findByIdAndUpdate(member._id, {
-        $inc: { contribution: paid }
-      })
+      await Member.findByIdAndUpdate(member._id, { $inc: { contribution: paid } })
     }
 
     res.status(201).json(transaction)
@@ -89,6 +73,7 @@ export const addIncome = async (req, res) => {
     res.status(400).json({ message: err.message })
   }
 }
+
 
 
 
@@ -387,38 +372,22 @@ export const deleteTransaction = async (req, res) => {
 export const updateIncome = async (req, res) => {
   try {
     const { id } = req.params
-    const {
-      amount,
-      paidAmount,
-      para,
-      name,
-      phoneNumber,
-    } = req.body
+    const { amount, paidAmount, para, name } = req.body
 
     const transaction = await Transaction.findById(id)
-
-    if (!transaction) {
-      return res.status(404).json({
-        success: false,
-        message: "Transaction not found",
-      })
-    }
+    if (!transaction) return res.status(404).json({ message: "Transaction not found" })
 
     const total = Number(amount)
     const paid = Number(paidAmount)
 
     if (paid > total) {
-      return res.status(400).json({
-        success: false,
-        message: "Paid amount cannot exceed total amount",
-      })
+      return res.status(400).json({ message: "Paid amount cannot exceed total amount" })
     }
 
     transaction.amount = total
     transaction.paidAmount = paid
-    transaction.para = para
-    transaction.name = name
-    transaction.phoneNumber = phoneNumber
+    transaction.para = para || ""
+    transaction.name = name || transaction.name
 
     transaction.paymentStatus = paid >= total ? "Paid" : "Due"
     transaction.paidDate = paid > 0 ? new Date() : null
@@ -428,14 +397,11 @@ export const updateIncome = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Income updated successfully",
-      transaction,
+      transaction
     })
-  } catch (error) {
-    console.error("Update income error:", error)
-    res.status(500).json({
-      success: false,
-      message: "Failed to update income",
-    })
+  } catch (err) {
+    console.error("Update income error:", err)
+    res.status(500).json({ success: false, message: "Failed to update income" })
   }
 }
 

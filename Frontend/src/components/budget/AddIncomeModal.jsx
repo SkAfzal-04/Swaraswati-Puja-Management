@@ -8,10 +8,9 @@ export default function AddIncomeModal({ onClose, fetchData, editData = null }) 
   const [amount, setAmount] = useState("")
   const [previousPaid, setPreviousPaid] = useState(0)
   const [newPaid, setNewPaid] = useState("")
-  const [para, setPara] = useState("")
+  const [para, setPara] = useState("") // Optional now
   const [type, setType] = useState("Chanda")
   const [name, setName] = useState("")
-  const [phoneNumber, setPhoneNumber] = useState("")
   const [memberId, setMemberId] = useState("")
   const [pujaYear, setPujaYear] = useState(new Date().getFullYear())
   const [loading, setLoading] = useState(false)
@@ -26,21 +25,13 @@ export default function AddIncomeModal({ onClose, fetchData, editData = null }) 
     setPara(editData.para ?? "")
     setType(editData.type ?? "Chanda")
     setPujaYear(editData.pujaYear ?? new Date().getFullYear())
-
     setMemberId(editData.member?._id ?? "")
 
-    // ✅ FIXED: handle ALL backend shapes safely
+    // Safe fallback for name
     setName(
       editData.donor?.name ||
         editData.member?.name ||
         editData.name ||
-        ""
-    )
-
-    setPhoneNumber(
-      editData.donor?.phoneNumber ||
-        editData.member?.phone ||
-        editData.phoneNumber ||
         ""
     )
   }, [editData])
@@ -50,13 +41,13 @@ export default function AddIncomeModal({ onClose, fetchData, editData = null }) 
     e.preventDefault()
     setError("")
 
-    if (!amount || !para || !type || !pujaYear) {
+    if (!amount || !type || !pujaYear) {
       setError("Please fill all required fields")
       return
     }
 
-    if (!memberId && (!name || !phoneNumber)) {
-      setError("Please enter name and phone number")
+    if (!memberId && !name) {
+      setError("Please enter a name")
       return
     }
 
@@ -76,12 +67,11 @@ export default function AddIncomeModal({ onClose, fetchData, editData = null }) 
       paidAmount: finalPaidAmount,
       paymentStatus:
         finalPaidAmount >= totalAmount ? "Paid" : "Due",
-      para,
+      para: para || "", // Optional
       type,
       pujaYear: Number(pujaYear),
       memberId: memberId || undefined,
-      name: memberId ? undefined : name,
-      phoneNumber: memberId ? undefined : phoneNumber
+      name: memberId ? undefined : name
     }
 
     try {
@@ -152,8 +142,8 @@ export default function AddIncomeModal({ onClose, fetchData, editData = null }) 
           )}
 
           <Input label={`Name ${memberId ? "" : "*"}`} value={name} onChange={setName} inputClass={inputClass} />
-          <Input label={`Phone Number ${memberId ? "" : "*"}`} value={phoneNumber} onChange={setPhoneNumber} inputClass={inputClass} />
-          <Input label="Para *" value={para} onChange={setPara} inputClass={inputClass} />
+
+          <Input label="Para" value={para} onChange={setPara} inputClass={inputClass} />
 
           <div>
             <label className="block mb-1 font-medium">Type *</label>

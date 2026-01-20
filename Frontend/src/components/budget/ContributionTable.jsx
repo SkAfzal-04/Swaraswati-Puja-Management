@@ -11,11 +11,9 @@ export default function ContributionTable({ data = [], expensesData = [], role, 
   const [filterType, setFilterType] = useState("All")
   const [sortAmount, setSortAmount] = useState(null)
 
-  // ===================== Separate contributions and expenses =====================
   const incomes = data || []
   const expenses = expensesData || []
 
-  // ===================== Button Styles =====================
   const btnBase =
     "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 active:scale-95"
   const btnPrimary = `${btnBase} bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500`
@@ -23,18 +21,13 @@ export default function ContributionTable({ data = [], expensesData = [], role, 
   const btnToggle =
     "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
 
-  // ===================== Delete Handler =====================
   const handleDelete = (record, isExpense = false) => {
-    // Instead of window.confirm, trigger the modal in parent
     setDeleteId(record._id)
     setDeleteType(isExpense ? "expense" : "transaction")
   }
 
-
-  // ===================== Filter + Sort =====================
   const filteredIncomes = useMemo(() => {
     let list = [...incomes]
-
 
     if (filterType === "Donor") list = list.filter((t) => t.donor)
     else if (filterType === "Chanda") list = list.filter((t) => t.type === "Chanda")
@@ -109,7 +102,6 @@ export default function ContributionTable({ data = [], expensesData = [], role, 
             <thead className="bg-gray-100">
               <tr>
                 <th className="px-4 py-2 text-left">Name</th>
-                <th className="px-4 py-2 text-left">Phone</th>
                 <th className="px-4 py-2 text-left">Para</th>
                 <th className="px-4 py-2 text-left">Total</th>
                 <th className="px-4 py-2 text-left">Paid</th>
@@ -125,7 +117,7 @@ export default function ContributionTable({ data = [], expensesData = [], role, 
             <tbody>
               {filteredIncomes.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-center py-4 text-gray-500">
+                  <td colSpan={8} className="text-center py-4 text-gray-500">
                     No contributions found
                   </td>
                 </tr>
@@ -142,20 +134,6 @@ export default function ContributionTable({ data = [], expensesData = [], role, 
                   >
                     <td className="px-4 py-2">
                       {t.donor?.name || t.member?.name || t.name || "Anonymous"}
-                    </td>
-
-                    <td className="px-4 py-2">
-                      {(() => {
-                        const phone =
-                          t.donor?.phoneNumber ||
-                          t.member?.phone ||
-                          t.phoneNumber ||
-                          "-"
-                        if (role === "Admin" || role === "Manager") return phone
-                        return phone.length >= 4
-                          ? `${phone.slice(0, 2)}${"X".repeat(phone.length - 4)}${phone.slice(-2)}`
-                          : phone
-                      })()}
                     </td>
 
                     <td className="px-4 py-2">{t.para}</td>
@@ -264,7 +242,7 @@ export default function ContributionTable({ data = [], expensesData = [], role, 
           fetchData={refreshData}
           onClose={() => {
             setEditData(null)
-            refreshData()   // ✅ REFETCH AFTER EDIT
+            refreshData()
           }}
         />
       )}
@@ -275,11 +253,10 @@ export default function ContributionTable({ data = [], expensesData = [], role, 
           fetchData={refreshData}
           onClose={() => {
             setEditData(null)
-            refreshData()   // ✅ REFETCH AFTER EDIT
+            refreshData()
           }}
         />
       )}
-
     </>
   )
 }

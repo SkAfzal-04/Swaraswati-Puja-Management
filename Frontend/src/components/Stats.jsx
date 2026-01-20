@@ -13,8 +13,8 @@ export default function Stats() {
 
         setStats([
           { label: "Members", value: `${data.members}+` },
-          { label: "Total Collection", value: `₹${formatAmount(data.totalDonation)}+` },
-          { label: "Paras Covered", value: `${data.parasCovered}+` }
+          { label: "Total Collection", value: `₹${formatAmount(data.totalCollection)}+` },
+          { label: "Total Expense", value: `₹${formatAmount(data.totalExpense)}+` }
         ]);
       } catch (err) {
         console.error("Failed to load stats", err);
@@ -36,7 +36,7 @@ export default function Stats() {
 
   return (
     <section className="py-20 bg-white">
-      <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+      <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 text-center">
         {stats.map((s, i) => (
           <motion.div
             key={i}

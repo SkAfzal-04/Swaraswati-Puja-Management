@@ -3,6 +3,7 @@ import User from "../models/User.js"
 import bcrypt from "bcryptjs"
 import mongoose from "mongoose"
 import Transaction from "../models/Transaction.js";
+import Expense from "../models/Expense.js";
 
 
 // ➕ Add Member
@@ -116,6 +117,7 @@ export const deleteMember = async (req, res) => {
 
 
 
+
 export const getStats = async (req, res) => {
   try {
     /* ===============================
@@ -129,11 +131,7 @@ export const getStats = async (req, res) => {
     const incomeTypes = ["Chanda", "Donation", "Member Contribution"];
 
     const incomeAgg = await Transaction.aggregate([
-      {
-        $match: {
-          type: { $in: incomeTypes }
-        }
-      },
+      { $match: { type: { $in: incomeTypes } } },
       {
         $group: {
           _id: null,
@@ -155,19 +153,13 @@ export const getStats = async (req, res) => {
     );
 
     /* ===============================
-       📍 PARAS COVERED
+       💸 TOTAL EXPENSES
     =============================== */
-    const parasAgg = await Transaction.aggregate([
-      {
-        $match: {
-          type: { $in: incomeTypes },
-          para: { $ne: "" }
-        }
-      },
-      { $group: { _id: "$para" } }
+    const expenseAgg = await Expense.aggregate([
+      { $group: { _id: null, totalExpense: { $sum: { $ifNull: ["$amount", 0] } } } }
     ]);
 
-    const parasCovered = parasAgg.length;
+    const totalExpense = expenseAgg[0]?.totalExpense || 0;
 
     /* ===============================
        🧮 FINAL TOTAL COLLECTION
@@ -176,11 +168,14 @@ export const getStats = async (req, res) => {
 
     res.json({
       members: totalMembers,
-      totalDonation: totalCollection, // 🔥 FIXED
-      parasCovered
+      totalCollection,    // Paid transactions + member contributions
+      totalMemberContribution,
+      totalExpense,
+      remainingBalance: totalCollection - totalExpense
     });
   } catch (err) {
     console.error("Stats Fetch Error:", err);
     res.status(500).json({ message: err.message });
   }
 };
+
