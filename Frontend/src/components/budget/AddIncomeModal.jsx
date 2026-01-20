@@ -4,10 +4,12 @@ import { addIncome, updateIncome } from "../../services/transactionApi"
 export default function AddIncomeModal({ onClose, fetchData, editData = null }) {
   const isEdit = Boolean(editData)
 
+  /* ---------------- State ---------------- */
   const [amount, setAmount] = useState("")
+  const [previousPaid, setPreviousPaid] = useState(0)
+  const [newPaid, setNewPaid] = useState("")
   const [para, setPara] = useState("")
   const [type, setType] = useState("Chanda")
-  const [isPaid, setIsPaid] = useState(true)
   const [name, setName] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
   const [memberId, setMemberId] = useState("")
@@ -15,21 +17,35 @@ export default function AddIncomeModal({ onClose, fetchData, editData = null }) 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  /* ---------- Prefill for edit ---------- */
+  /* ---------------- Prefill (Edit) ---------------- */
   useEffect(() => {
     if (!editData) return
 
     setAmount(editData.amount ?? "")
+    setPreviousPaid(Number(editData.paidAmount ?? 0))
     setPara(editData.para ?? "")
     setType(editData.type ?? "Chanda")
-    setIsPaid(editData.paymentStatus === "Paid")
     setPujaYear(editData.pujaYear ?? new Date().getFullYear())
+
     setMemberId(editData.member?._id ?? "")
-    setName(editData.donor?.name || editData.member?.name || "")
-    setPhoneNumber(editData.donor?.phoneNumber || editData.member?.phone || "")
+
+    // ✅ FIXED: handle ALL backend shapes safely
+    setName(
+      editData.donor?.name ||
+        editData.member?.name ||
+        editData.name ||
+        ""
+    )
+
+    setPhoneNumber(
+      editData.donor?.phoneNumber ||
+        editData.member?.phone ||
+        editData.phoneNumber ||
+        ""
+    )
   }, [editData])
 
-  /* ---------- Submit ---------- */
+  /* ---------------- Submit ---------------- */
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
@@ -40,28 +56,40 @@ export default function AddIncomeModal({ onClose, fetchData, editData = null }) 
     }
 
     if (!memberId && (!name || !phoneNumber)) {
-      setError("Please enter donor name and phone number")
+      setError("Please enter name and phone number")
+      return
+    }
+
+    const totalAmount = Number(amount)
+    const addedPaid = Number(newPaid || 0)
+    const finalPaidAmount = isEdit
+      ? previousPaid + addedPaid
+      : addedPaid
+
+    if (finalPaidAmount > totalAmount) {
+      setError("Total paid amount cannot exceed total amount")
       return
     }
 
     const payload = {
-      amount: Number(amount),
+      amount: totalAmount,
+      paidAmount: finalPaidAmount,
+      paymentStatus:
+        finalPaidAmount >= totalAmount ? "Paid" : "Due",
       para,
       type,
-      isPaid,
       pujaYear: Number(pujaYear),
       memberId: memberId || undefined,
       name: memberId ? undefined : name,
-      phoneNumber: memberId ? undefined : phoneNumber,
+      phoneNumber: memberId ? undefined : phoneNumber
     }
 
     try {
       setLoading(true)
-      if (isEdit) {
-        await updateIncome(editData._id, payload)
-      } else {
-        await addIncome(payload)
-      }
+      isEdit
+        ? await updateIncome(editData._id, payload)
+        : await addIncome(payload)
+
       fetchData?.()
       onClose()
     } catch (err) {
@@ -71,62 +99,86 @@ export default function AddIncomeModal({ onClose, fetchData, editData = null }) 
     }
   }
 
-  /* ---------- Button & Input Styles ---------- */
-  const btnBase =
-    "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 active:scale-95"
+  /* ---------------- UI Classes ---------------- */
+  const inputClass =
+    "w-full border-2 border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-400"
 
-  const btnPrimary =
-    `${btnBase} bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md focus:ring-blue-500`
-  const btnSecondary =
-    `${btnBase} bg-gray-200 text-gray-800 hover:bg-gray-300 hover:shadow-md focus:ring-gray-400`
-  const inputPrimary =
-    "w-full border-2 border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition"
+  const btn =
+    "w-full rounded-lg px-3 py-2 font-medium transition"
 
+  /* ---------------- Render ---------------- */
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3">
       <form
         onSubmit={handleSubmit}
-        className="bg-white w-full max-w-md rounded-xl shadow-lg max-h-[90vh] flex flex-col"
+        className="bg-white w-full max-w-md max-h-[90vh] rounded-xl shadow-lg flex flex-col"
       >
         {/* Header */}
-        <div className="p-4 border-b">
+        <div className="p-4 border-b shrink-0">
           <h2 className="text-xl font-bold">
-            {isEdit ? "Edit Contribution" : "Add Contribution"}
+            {isEdit ? "Edit Income" : "Add Income"}
           </h2>
         </div>
 
-        {/* Scrollable Body */}
+        {/* Body (Scrollable) */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {error && <p className="text-red-500">{error}</p>}
 
-          <Input label="Amount *" type="number" value={amount} onChange={setAmount} inputClass={inputPrimary} />
-          <Input label={`Donor Name ${memberId ? "" : "*"}`} value={name} onChange={setName} inputClass={inputPrimary} />
-          <Input label={`Phone Number ${memberId ? "" : "*"}`} type="tel" value={phoneNumber} onChange={setPhoneNumber} inputClass={inputPrimary} />
-          <Input label="Para *" value={para} onChange={setPara} inputClass={inputPrimary} />
+          <Input label="Total Amount *" type="number" value={amount} onChange={setAmount} inputClass={inputClass} />
+
+          {isEdit && (
+            <Input
+              label="Previously Paid"
+              type="number"
+              value={previousPaid}
+              disabled
+              inputClass={inputClass + " bg-gray-100"}
+            />
+          )}
+
+          <Input
+            label={isEdit ? "Add New Payment" : "Paid Amount *"}
+            type="number"
+            value={newPaid}
+            onChange={setNewPaid}
+            inputClass={inputClass}
+          />
+
+          {isEdit && (
+            <p className="text-sm text-gray-600">
+              Final Paid Amount:{" "}
+              <strong>{previousPaid + Number(newPaid || 0)}</strong>
+            </p>
+          )}
+
+          <Input label={`Name ${memberId ? "" : "*"}`} value={name} onChange={setName} inputClass={inputClass} />
+          <Input label={`Phone Number ${memberId ? "" : "*"}`} value={phoneNumber} onChange={setPhoneNumber} inputClass={inputClass} />
+          <Input label="Para *" value={para} onChange={setPara} inputClass={inputClass} />
 
           <div>
             <label className="block mb-1 font-medium">Type *</label>
-            <select value={type} onChange={(e) => setType(e.target.value)} className={inputPrimary}>
+            <select value={type} onChange={(e) => setType(e.target.value)} className={inputClass}>
               <option value="Chanda">Chanda</option>
               <option value="Donation">Donation</option>
             </select>
           </div>
 
-          <Input label="Puja Year *" type="number" value={pujaYear} onChange={setPujaYear} inputClass={inputPrimary} />
+          <Input label="Puja Year *" type="number" value={pujaYear} onChange={setPujaYear} inputClass={inputClass} />
 
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={isPaid} onChange={(e) => setIsPaid(e.target.checked)} />
-            <span>Mark as Paid</span>
-          </label>
+          <p className="text-sm font-medium">
+            Status:{" "}
+            <span className={previousPaid + Number(newPaid || 0) >= amount ? "text-green-600" : "text-orange-600"}>
+              {previousPaid + Number(newPaid || 0) >= amount ? "Paid" : "Due"}
+            </span>
+          </p>
         </div>
 
         {/* Footer */}
-        <div className="border-t p-4 flex gap-3">
-          <button type="button" onClick={onClose} className={btnSecondary + " w-full"}>
+        <div className="border-t p-4 flex gap-3 shrink-0">
+          <button type="button" onClick={onClose} className={btn + " bg-gray-200"}>
             Cancel
           </button>
-
-          <button type="submit" disabled={loading} className={btnPrimary + " w-full"}>
+          <button type="submit" disabled={loading} className={btn + " bg-blue-600 text-white"}>
             {loading ? "Saving..." : isEdit ? "Update" : "Add"}
           </button>
         </div>
@@ -135,12 +187,18 @@ export default function AddIncomeModal({ onClose, fetchData, editData = null }) 
   )
 }
 
-/* ---------- Small reusable input ---------- */
-function Input({ label, type = "text", value, onChange, inputClass }) {
+/* ---------------- Input ---------------- */
+function Input({ label, type = "text", value, onChange, inputClass, disabled = false }) {
   return (
     <div>
       <label className="block mb-1 font-medium">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />
+      <input
+        type={type}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange?.(e.target.value)}
+        className={inputClass}
+      />
     </div>
   )
 }

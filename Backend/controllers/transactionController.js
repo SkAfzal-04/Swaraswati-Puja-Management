@@ -15,16 +15,11 @@ export const addIncome = async (req, res) => {
       phoneNumber,
       memberId,
       amount,
+      paidAmount = 0,
       type,
       pujaYear,
-      isPaid,
-      para // <-- include para from frontend
+      para
     } = req.body
-    console.log("Add Income Request Body:", req.body)
-
-    if (!["Chanda", "Donation"].includes(type)) {
-      return res.status(400).json({ message: "Invalid income type" })
-    }
 
     if (!amount || !pujaYear || !para) {
       return res.status(400).json({ message: "Required fields missing" })
@@ -36,7 +31,7 @@ export const addIncome = async (req, res) => {
     let txnName = name || ""
     let txnPhone = phoneNumber || ""
 
-    /* -------------------- MEMBER CONTRIBUTION -------------------- */
+    /* ---------------- MEMBER ---------------- */
     if (memberId) {
       member = await Member.findById(memberId)
       if (!member) {
@@ -46,15 +41,9 @@ export const addIncome = async (req, res) => {
       finalType = "Member Contribution"
       txnName = member.name
       txnPhone = member.phone || ""
-
-      if (isPaid) {
-        await Member.findByIdAndUpdate(memberId, {
-          $inc: { contribution: Number(amount) }
-        })
-      }
     }
 
-    /* -------------------- PUBLIC DONATION -------------------- */
+    /* ---------------- DONOR ---------------- */
     else if (type === "Donation") {
       if (!name && !phoneNumber) {
         return res.status(400).json({ message: "Donor info required" })
@@ -69,21 +58,30 @@ export const addIncome = async (req, res) => {
       txnPhone = donor.phoneNumber
     }
 
-    /* -------------------- CREATE TRANSACTION -------------------- */
+    const paid = Number(paidAmount)
+    const total = Number(amount)
+
     const transaction = await Transaction.create({
-      member: member ? member._id : null,
-      donor: donor ? donor._id : null,
+      member: member?._id || null,
+      donor: donor?._id || null,
       name: txnName,
       phoneNumber: txnPhone,
-      para, // ✅ include para
-      amount: Number(amount),
-      paidAmount: isPaid ? Number(amount) : 0,
-      paymentStatus: isPaid ? "Paid" : "Due",
-      paidDate: isPaid ? new Date() : null,
+      para,
+      amount: total,
+      paidAmount: paid,
+      paymentStatus: paid >= total ? "Paid" : "Due",
+      paidDate: paid > 0 ? new Date() : null,
       type: finalType,
-      addedBy: req.user.id,
+      addedBy: req.user._id,   // ✅ FIXED
       pujaYear: Number(pujaYear)
     })
+
+    /* ---- update member contribution ONLY if paid ---- */
+    if (member && paid > 0) {
+      await Member.findByIdAndUpdate(member._id, {
+        $inc: { contribution: paid }
+      })
+    }
 
     res.status(201).json(transaction)
   } catch (err) {
@@ -93,33 +91,6 @@ export const addIncome = async (req, res) => {
 }
 
 
-/* =========================================================
-   ➖ ADD EXPENSE (ALWAYS PAID)
-========================================================= */
-export const addExpense = async (req, res) => {
-  try {
-    const { amount, category, paymentMode, pujaYear, notes } = req.body
-
-    if (!amount || !category || !pujaYear) {
-      return res.status(400).json({ message: "Required fields missing" })
-    }
-
-    const expense = await Expense.create({
-      amount: Number(amount),
-      category,
-      paymentMode: paymentMode || "Cash",
-      paidDate: new Date(),
-      addedBy: req.user.id,
-      pujaYear: Number(pujaYear),
-      notes: notes || ""
-    })
-
-    res.status(201).json(expense)
-  } catch (err) {
-    console.error("Add Expense Error:", err)
-    res.status(400).json({ message: err.message })
-  }
-}
 
 /* =========================================================
    🔄 MARK DUE INCOME AS PAID
@@ -171,52 +142,52 @@ export const getTransactions = async (req, res) => {
   }
 }
 
-/* =========================================================
-   📋 GET ALL EXPENSES
-========================================================= */
-export const getExpenses = async (req, res) => {
-  try {
-    const { pujaYear } = req.query
-    const match = pujaYear ? { pujaYear: Number(pujaYear) } : {}
-
-    const expenses = await Expense.find(match)
-      .populate("addedBy", "userId role")
-      .sort({ createdAt: -1 })
-
-    res.json(expenses)
-  } catch (err) {
-    console.error("Get Expenses Error:", err)
-    res.status(500).json({ message: err.message })
-  }
-}
 
 /* =========================================================
    📈 INCOME SUMMARY
 ========================================================= */
+
+
 export const getSummary = async (req, res) => {
   try {
     const { pujaYear } = req.query
-    const match = { paymentStatus: "Paid" }
-    if (pujaYear) match.pujaYear = Number(pujaYear)
+    const baseMatch = {}
+    if (pujaYear) baseMatch.pujaYear = Number(pujaYear)
 
-    // Only include Chanda, Donation, or Member Contribution
-    const types = ["Chanda", "Donation", "Member Contribution"]
-    match.type = { $in: types }
+    // Valid income types from transactions
+    const incomeTypes = ["Chanda", "Donation", "Member Contribution"]
 
-    // Aggregate total income
-    const incomeTx = await Transaction.aggregate([
-      { $match: match },
+    /* ===============================
+       💰 TRANSACTION INCOME SUMMARY
+    =============================== */
+    const incomeAgg = await Transaction.aggregate([
+      { $match: { ...baseMatch, type: { $in: incomeTypes } } },
       {
         $group: {
           _id: null,
-          totalIncome: { $sum: { $ifNull: ["$paidAmount", 0] } }
+          totalBudgetTx: { $sum: { $ifNull: ["$amount", 0] } },        // Paid + Due
+          actualCollectionTx: { $sum: { $ifNull: ["$paidAmount", 0] } } // Paid only
         }
       }
     ])
 
-    // Aggregate total expense
-    const expenseTx = await Expense.aggregate([
-      { $match: pujaYear ? { pujaYear: Number(pujaYear) } : {} },
+    const totalBudgetTx = incomeAgg[0]?.totalBudgetTx || 0
+    const actualCollectionTx = incomeAgg[0]?.actualCollectionTx || 0
+
+    /* ===============================
+       🧾 MEMBER CONTRIBUTION SUMMARY
+    =============================== */
+    const members = await Member.find({ active: true }).select("contribution")
+    const totalMemberContribution = members.reduce(
+      (sum, m) => sum + (m.contribution || 0),
+      0
+    )
+
+    /* ===============================
+       💸 EXPENSE SUMMARY
+    =============================== */
+    const expenseAgg = await Expense.aggregate([
+      { $match: baseMatch },
       {
         $group: {
           _id: null,
@@ -224,11 +195,22 @@ export const getSummary = async (req, res) => {
         }
       }
     ])
+    const totalExpense = expenseAgg[0]?.totalExpense || 0
+
+    /* ===============================
+       🧮 FINAL RESPONSE
+    =============================== */
+    const totalCollection = actualCollectionTx + totalMemberContribution
+    const expectedCollection = totalBudgetTx + totalMemberContribution
+    const dueAmount = expectedCollection - totalCollection
 
     res.json({
-      totalIncome: incomeTx[0]?.totalIncome || 0,
-      totalExpense: expenseTx[0]?.totalExpense || 0,
-      balance: (incomeTx[0]?.totalIncome || 0) - (expenseTx[0]?.totalExpense || 0)
+      totalCollection,             // Paid only (transactions + members)
+      totalMemberContribution,      // Only member contributions
+      dueAmount,                    // Due amount
+      expectedCollection,           // Total including due
+      totalExpense,                 // Expenses
+      remainingBalance: totalCollection - totalExpense // Cash in hand minus expenses
     })
   } catch (err) {
     console.error("Get Summary Error:", err)
@@ -236,22 +218,121 @@ export const getSummary = async (req, res) => {
   }
 }
 
+
 /* =========================================================
    🏆 TOP DONORS
+========================================================= */
+/* =========================================================
+   🏆 TOP DONORS (with names)
 ========================================================= */
 export const topDonors = async (req, res) => {
   try {
     const data = await Transaction.aggregate([
-      { $match: { type: { $in: ["Chanda", "Donation"] }, donor: { $ne: null }, paymentStatus: "Paid" } },
-      { $group: { _id: "$donor", total: { $sum: "$paidAmount" } } },
+      { 
+        $match: { type: { $in: ["Chanda", "Donation"] }, donor: { $ne: null }, paymentStatus: "Paid" } 
+      },
+      {
+        $group: { _id: "$donor", total: { $sum: "$paidAmount" } }
+      },
       { $sort: { total: -1 } },
-      { $limit: 5 }
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: "donors",        // donor collection
+          localField: "_id",
+          foreignField: "_id",
+          as: "donorInfo"
+        }
+      },
+      { $unwind: "$donorInfo" },
+      {
+        $project: {
+          _id: 0,
+          name: "$donorInfo.name",
+          phoneNumber: "$donorInfo.phoneNumber",
+          total: 1
+        }
+      }
     ])
     res.json(data)
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
 }
+
+/* =========================================================
+   📅 DONOR BY DATE (with names)
+========================================================= */
+export const donorByDate = async (req, res) => {
+  try {
+    const data = await Transaction.aggregate([
+      {
+        $match: { type: { $in: ["Chanda", "Donation"] }, donor: { $ne: null }, paymentStatus: "Paid" }
+      },
+      {
+        $group: {
+          _id: { donor: "$donor", date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } } },
+          totalPaid: { $sum: "$paidAmount" }
+        }
+      },
+      {
+        $lookup: {
+          from: "donors",
+          localField: "_id.donor",
+          foreignField: "_id",
+          as: "donorInfo"
+        }
+      },
+      { $unwind: "$donorInfo" },
+      {
+        $project: {
+          _id: 0,
+          name: "$donorInfo.name",
+          phoneNumber: "$donorInfo.phoneNumber",
+          date: "$_id.date",
+          totalPaid: 1
+        }
+      },
+      { $sort: { date: 1, totalPaid: -1 } }
+    ])
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+/* =========================================================
+   📈 EXPENSE BY DATE (line graph)
+========================================================= */
+export const expenseByDate = async (req, res) => {
+  try {
+    const { pujaYear } = req.query
+    const match = {}
+    if (pujaYear) match.pujaYear = Number(pujaYear)
+
+    const data = await Expense.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$paidDate" } },
+          total: { $sum: "$amount" }
+        }
+      },
+      { $sort: { "_id": 1 } },
+      {
+        $project: {
+          date: "$_id",
+          total: 1,
+          _id: 0
+        }
+      }
+    ])
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
 
 /* =========================================================
    🗑️ DELETE TRANSACTION
@@ -273,21 +354,7 @@ export const deleteTransaction = async (req, res) => {
   }
 }
 
-/* =========================================================
-   🗑️ DELETE EXPENSE
-========================================================= */
-export const deleteExpense = async (req, res) => {
-  try {
-    const { id } = req.params
-    const expense = await Expense.findById(id)
-    if (!expense) return res.status(404).json({ message: "Expense not found" })
 
-    await Expense.findByIdAndDelete(id)
-    res.json({ message: "Expense deleted successfully" })
-  } catch (err) {
-    res.status(500).json({ message: err.message })
-  }
-}
 
 
 /* =========================================================
@@ -300,73 +367,58 @@ export const deleteExpense = async (req, res) => {
 export const updateIncome = async (req, res) => {
   try {
     const { id } = req.params
-    const { name, phoneNumber, memberId, para, amount, type, pujaYear, isPaid } = req.body
+    const {
+      amount,
+      paidAmount,
+      para,
+      name,
+      phoneNumber,
+    } = req.body
 
-    const txn = await Transaction.findById(id)
-    if (!txn) return res.status(404).json({ message: "Transaction not found" })
+    const transaction = await Transaction.findById(id)
 
-    // Adjust member contribution if payment status changes
-    if (txn.member) {
-      if (txn.paymentStatus === "Paid" && !isPaid) {
-        await Member.findByIdAndUpdate(txn.member, { $inc: { contribution: -txn.paidAmount } })
-      }
-      if (txn.paymentStatus === "Due" && isPaid) {
-        await Member.findByIdAndUpdate(txn.member, { $inc: { contribution: Number(amount) } })
-      }
-    }
-
-    // Update donor info if public donor
-    if (txn.donor) {
-      await Donor.findByIdAndUpdate(txn.donor, {
-        name: name || "Anonymous",
-        phoneNumber: phoneNumber || ""
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        message: "Transaction not found",
       })
     }
 
-    txn.name = name || txn.name
-    txn.phoneNumber = phoneNumber || txn.phoneNumber
-    txn.para = para
-    txn.amount = Number(amount)
-    txn.type = memberId ? "Member Contribution" : type
-    txn.pujaYear = Number(pujaYear)
-    txn.paymentStatus = isPaid ? "Paid" : "Due"
-    txn.paidAmount = isPaid ? Number(amount) : 0
-    txn.paidDate = isPaid ? new Date() : null
-    txn.member = memberId || txn.member
+    const total = Number(amount)
+    const paid = Number(paidAmount)
 
-    await txn.save()
+    if (paid > total) {
+      return res.status(400).json({
+        success: false,
+        message: "Paid amount cannot exceed total amount",
+      })
+    }
 
-    res.json({ message: "Income updated successfully", txn })
-  } catch (err) {
-    res.status(500).json({ message: err.message })
+    transaction.amount = total
+    transaction.paidAmount = paid
+    transaction.para = para
+    transaction.name = name
+    transaction.phoneNumber = phoneNumber
+
+    transaction.paymentStatus = paid >= total ? "Paid" : "Due"
+    transaction.paidDate = paid > 0 ? new Date() : null
+
+    await transaction.save()
+
+    res.status(200).json({
+      success: true,
+      message: "Income updated successfully",
+      transaction,
+    })
+  } catch (error) {
+    console.error("Update income error:", error)
+    res.status(500).json({
+      success: false,
+      message: "Failed to update income",
+    })
   }
 }
 
-/* =========================================================
-   ✏️ UPDATE EXPENSE
-========================================================= */
-export const updateExpense = async (req, res) => {
-  try {
-    const { id } = req.params
-    const { amount, category, paymentMode, pujaYear, notes } = req.body
-
-    const expense = await Expense.findById(id)
-    if (!expense) return res.status(404).json({ message: "Expense not found" })
-
-    expense.amount = Number(amount)
-    expense.category = category
-    expense.paymentMode = paymentMode || "Cash"
-    expense.pujaYear = Number(pujaYear)
-    expense.notes = notes || expense.notes
-    expense.paidDate = new Date()
-
-    await expense.save()
-
-    res.json({ message: "Expense updated successfully", expense })
-  } catch (err) {
-    res.status(500).json({ message: err.message })
-  }
-}
 
 /* =========================================================
    📊 PARA-WISE COLLECTION
@@ -422,29 +474,207 @@ export const dayWiseCollection = async (req, res) => {
 ========================================================= */
 export const incomeVsExpense = async (req, res) => {
   try {
-    const { pujaYear } = req.query
-    const matchIncome = { type: { $in: ["Chanda", "Donation", "Member Contribution"] }, paymentStatus: "Paid" }
-    const matchExpense = {}
+    const { pujaYear } = req.query;
+
+    // -------------------- TRANSACTIONS --------------------
+    const matchIncome = {
+      type: { $in: ["Chanda", "Donation"] }
+    };
+    if (pujaYear) matchIncome.pujaYear = Number(pujaYear);
+
+    // Sum of paid transactions
+    const txnPaid = await Transaction.aggregate([
+      { $match: { ...matchIncome, paymentStatus: "Paid" } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$paidDate" } },
+          totalPaid: { $sum: "$paidAmount" }
+        }
+      },
+      { $sort: { "_id": 1 } },
+    ]);
+
+    // Sum of due transactions
+    const txnDue = await Transaction.aggregate([
+      { $match: { ...matchIncome, paymentStatus: "Due" } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$paidDate" } },
+          totalDue: { $sum: { $subtract: ["$amount", "$paidAmount"] } }
+        }
+      },
+    ]);
+
+    // -------------------- MEMBER CONTRIBUTIONS --------------------
+    const memberMatch = { active: true };
     if (pujaYear) {
-      matchIncome.pujaYear = Number(pujaYear)
-      matchExpense.pujaYear = Number(pujaYear)
+      const start = new Date(`${pujaYear}-01-01`);
+      const end = new Date(`${pujaYear}-12-31`);
+      memberMatch.joiningDate = { $lte: end };
     }
 
-    const incomeData = await Transaction.aggregate([
-      { $match: matchIncome },
-      { $group: { _id: null, total: { $sum: "$paidAmount" } } }
-    ])
+    const members = await Member.find(memberMatch).select("contribution joiningDate");
+
+    const memberIncome = members
+      .filter((m) => m.contribution && m.contribution > 0)
+      .map((m) => ({
+        _id: m.joiningDate.toISOString().slice(0, 10),
+        total: m.contribution
+      }));
+
+    // -------------------- MERGE INCOME BY DATE --------------------
+    const incomeMap = {};
+
+    // Paid transactions
+    txnPaid.forEach(d => {
+      if (!incomeMap[d._id]) incomeMap[d._id] = 0;
+      incomeMap[d._id] += d.totalPaid;
+    });
+
+    // Member contributions
+    memberIncome.forEach(d => {
+      if (!incomeMap[d._id]) incomeMap[d._id] = 0;
+      incomeMap[d._id] += d.total;
+    });
+
+    // Deduct unpaid dues
+    txnDue.forEach(d => {
+      if (!incomeMap[d._id]) incomeMap[d._id] = 0;
+      incomeMap[d._id] -= d.totalDue;
+      if (incomeMap[d._id] < 0) incomeMap[d._id] = 0; // avoid negative
+    });
+
+    // -------------------- EXPENSES --------------------
+    const matchExpense = {};
+    if (pujaYear) matchExpense.pujaYear = Number(pujaYear);
 
     const expenseData = await Expense.aggregate([
       { $match: matchExpense },
-      { $group: { _id: null, total: { $sum: "$amount" } } }
-    ])
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$paidDate" } },
+          total: { $sum: "$amount" },
+        }
+      },
+      { $sort: { "_id": 1 } },
+    ]);
 
-    const totalIncome = incomeData[0]?.total || 0
-    const totalExpense = expenseData[0]?.total || 0
+    const expenseMap = {};
+    expenseData.forEach(d => {
+      expenseMap[d._id] = d.total;
+    });
 
-    res.json({ totalIncome, totalExpense, balance: totalIncome - totalExpense })
+    // -------------------- COMBINE ALL DATES --------------------
+    const allDates = Array.from(
+      new Set([...Object.keys(incomeMap), ...Object.keys(expenseMap)])
+    ).sort();
+
+    const combined = allDates.map(date => ({
+      date,
+      income: incomeMap[date] || 0,
+      expense: expenseMap[date] || 0,
+    }));
+
+    res.json(combined);
   } catch (err) {
+    console.error("Income vs Expense by Date Error:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
+
+export const addExpense = async (req, res) => {
+  try {
+    const { amount, category, paymentMode, pujaYear, notes } = req.body
+
+    if (!amount || !category || !pujaYear) {
+      return res.status(400).json({ message: "Required fields missing" })
+    }
+
+    const expense = await Expense.create({
+      amount: Number(amount),
+      category,
+      paymentMode: paymentMode || "Cash",
+      paidDate: new Date(),
+      addedBy: req.user._id, // ✅ FIXED
+      pujaYear: Number(pujaYear),
+      notes: notes || "",
+    })
+
+    res.status(201).json(expense)
+  } catch (err) {
+    console.error("Add Expense Error:", err)
+    res.status(400).json({ message: err.message })
+  }
+}
+
+/* =========================================================
+   📋 GET ALL EXPENSES
+========================================================= */
+export const getExpenses = async (req, res) => {
+  try {
+    const { pujaYear } = req.query
+    const filter = pujaYear ? { pujaYear: Number(pujaYear) } : {}
+
+    const expenses = await Expense.find(filter)
+      .populate("addedBy", "name role")
+      .sort({ createdAt: -1 })
+    console.log("Fetched Expenses:", expenses)
+
+    res.json(expenses)
+  } catch (err) {
+    console.error("Get Expenses Error:", err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+/* =========================================================
+   ✏️ UPDATE EXPENSE
+========================================================= */
+export const updateExpense = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { amount, category, paymentMode, pujaYear, notes } = req.body
+
+    if (!amount || !category || !pujaYear) {
+      return res.status(400).json({ message: "Required fields missing" })
+    }
+
+    const expense = await Expense.findById(id)
+    if (!expense) return res.status(404).json({ message: "Expense not found" })
+
+    expense.amount = Number(amount)
+    expense.category = category
+    expense.paymentMode = paymentMode || "Cash"
+    expense.pujaYear = Number(pujaYear)
+    expense.notes = notes ?? expense.notes
+    expense.paidDate = new Date()
+
+    await expense.save()
+
+    res.json({ message: "Expense updated successfully", expense })
+  } catch (err) {
+    console.error("Update Expense Error:", err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+/* =========================================================
+   🗑️ DELETE EXPENSE
+========================================================= */
+export const deleteExpense = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const expense = await Expense.findById(id)
+    if (!expense) return res.status(404).json({ message: "Expense not found" })
+
+    await Expense.findByIdAndDelete(id)
+
+    res.json({ message: "Expense deleted successfully" })
+  } catch (err) {
+    console.error("Delete Expense Error:", err)
     res.status(500).json({ message: err.message })
   }
 }

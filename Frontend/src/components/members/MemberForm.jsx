@@ -161,7 +161,7 @@ export default function MemberForm({ selected = null, onSuccess, onClose }) {
           Active Member
         </label>
 
-        {member.role === "Manager" && (
+        {!selected && member.role === "Manager" && (
           <>
             <input
               name="userId"
@@ -182,6 +182,7 @@ export default function MemberForm({ selected = null, onSuccess, onClose }) {
             />
           </>
         )}
+
 
         <div className="col-span-2 flex justify-end gap-3 mt-2">
           <button

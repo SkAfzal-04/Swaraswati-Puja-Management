@@ -4,16 +4,14 @@ import ContributionTable from "../components/budget/ContributionTable"
 import BudgetGraphs from "../components/budget/BudgetGraphs"
 import AddIncomeModal from "../components/budget/AddIncomeModal"
 import AddExpenseModal from "../components/budget/AddExpenseModal"
-import {
-  getSummary,
-  getTransactions,
-} from "../services/transactionApi"
+import { getSummary, getTransactions, getExpenses } from "../services/transactionApi"
 import toast from "react-hot-toast"
 
 export default function Budget() {
   const [role, setRole] = useState(null)
   const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, balance: 0 })
   const [transactions, setTransactions] = useState([])
+  const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
   const [showIncome, setShowIncome] = useState(false)
   const [showExpense, setShowExpense] = useState(false)
@@ -31,7 +29,6 @@ export default function Budget() {
   const fetchSummary = async () => {
     try {
       const data = await getSummary()
-      console.log("Fetched summary:", data)
       if (data) setSummary(data)
     } catch (err) {
       console.error("Failed to fetch summary:", err)
@@ -43,28 +40,28 @@ export default function Budget() {
   const fetchTransactions = async () => {
     try {
       setLoading(true)
-      const data = await getTransactions()
-      if (data) {
-        // Map each transaction to displayName / displayPhone
-        const mapped = data.map(tx => ({
-          ...tx,
-          displayName:
-            tx.member?.name || tx.donor?.name || tx.name || "Anonymous",
-          displayPhone:
-            tx.member?.phone || tx.donor?.phoneNumber || tx.phoneNumber || "-",
-          amount: tx.amount,
-          paidAmount: tx.paidAmount,
-          paymentStatus: tx.paymentStatus,
-          type: tx.type,
-          para: tx.para,
-          pujaYear: tx.pujaYear,
-          addedBy: tx.addedBy,
-        }))
-        setTransactions(mapped)
-      }
+      const txData = await getTransactions()
+      const expData = await getExpenses() // <-- fetch expenses
+
+      // Map transactions for display
+      const mappedTx = (txData || []).map(tx => ({
+        ...tx,
+        displayName: tx.member?.name || tx.donor?.name || tx.name || "Anonymous",
+        displayPhone: tx.member?.phone || tx.donor?.phoneNumber || tx.phoneNumber || "-",
+        amount: tx.amount,
+        paidAmount: tx.paidAmount,
+        paymentStatus: tx.paymentStatus,
+        type: tx.type,
+        para: tx.para,
+        pujaYear: tx.pujaYear,
+        addedBy: tx.addedBy,
+      }))
+
+      setTransactions(mappedTx)
+      setExpenses(expData || []) // <-- set expenses state
     } catch (err) {
-      console.error("Failed to fetch transactions:", err)
-      toast.error("Failed to load contributions")
+      console.error("Failed to fetch data:", err)
+      toast.error("Failed to load contributions or expenses")
     } finally {
       setLoading(false)
     }
@@ -115,6 +112,7 @@ export default function Budget() {
       {!showGraphs ? (
         <ContributionTable
           data={transactions}
+          expensesData={expenses} // <-- pass expenses as prop
           role={role}
           loading={loading}
           fetchData={() => {
