@@ -1,11 +1,57 @@
 import { useState, useMemo } from "react"
 
+/* =========================
+   SKELETON LOADER
+========================= */
+function TableSkeleton({ rows = 5, columns = 8 }) {
+  return (
+    <div className="overflow-x-auto bg-white rounded-xl shadow-md p-4 animate-pulse">
+      <table className="min-w-[700px] w-full text-sm sm:text-base">
+        <thead>
+          <tr>
+            {Array.from({ length: columns }).map((_, i) => (
+              <th
+                key={i}
+                className="p-3 bg-orange-400 rounded mb-2"
+              >
+                <div className="h-4 w-24 bg-orange-300 rounded mx-auto" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: rows }).map((_, i) => (
+            <tr key={i} className="border-b">
+              {Array.from({ length: columns }).map((_, j) => (
+                <td
+                  key={j}
+                  className="p-3"
+                >
+                  <div
+                    className={`h-4 bg-gray-200 rounded ${
+                      j % 2 === 0 ? "w-3/4" : "w-1/2"
+                    }`}
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/* =========================
+   MAIN COMPONENT
+========================= */
 export default function MemberTable({
   members,
   currentUserRole,
   onView,
   onEdit,
-  onDelete
+  onDelete,
+  loading = false, // new prop to trigger skeleton
 }) {
   const canEdit = currentUserRole === "Admin" || currentUserRole === "Manager"
 
@@ -49,6 +95,11 @@ export default function MemberTable({
 
     return list
   }, [members, search, sortAmount])
+
+  /* =========================
+     RENDER
+  ========================= */
+  if (loading) return <TableSkeleton rows={5} columns={canEdit ? 8 : 7} />
 
   return (
     <div>

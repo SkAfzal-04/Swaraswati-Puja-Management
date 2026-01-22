@@ -14,7 +14,8 @@ import {
   incomeVsExpense,
   donorByDate,
   topDonors,
-  expenseByDate
+  getCollectionBarGraph,
+  expenseByItem
 } from "../controllers/transactionController.js"
 import { protect } from "../middleware/authMiddleware.js"
 
@@ -31,7 +32,8 @@ router.get("/graphs/day", protect, dayWiseCollection)
 router.get("/graphs/income-expense", protect, incomeVsExpense)
 router.get("/graphs/top-donors", protect, topDonors)
 router.get("/graphs/donor-date", protect, donorByDate)
-router.get("/graphs/expense-date", protect, expenseByDate)
+router.get("/graphs/collection-bar", protect, getCollectionBarGraph)
+router.get("/graphs/expense-date", protect, expenseByItem)
 /* =========================================================
    ➕ ADD
 ========================================================= */

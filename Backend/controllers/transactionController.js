@@ -195,7 +195,7 @@ export const getSummary = async (req, res) => {
       dueAmount,                    // Due amount
       expectedCollection,           // Total including due
       totalExpense,                 // Expenses
-      remainingBalance: totalCollection - totalExpense // Cash in hand minus expenses
+      TotalChandaExceptMembers: totalCollection - totalMemberContribution // Cash in hand minus expenses
     })
   } catch (err) {
     console.error("Get Summary Error:", err)
@@ -251,6 +251,75 @@ export const topDonors = async (req, res) => {
     res.status(500).json({ message: err.message })
   }
 }
+
+
+/* =========================================================
+   📊 BAR CHART DATA FOR COLLECTIONS
+   - Total Member Contribution
+   - Total Donor Paid
+   - Total Chanda Paid
+   - Only paidAmount is considered
+========================================================= */
+export const getCollectionBarGraph = async (req, res) => {
+  try {
+    const { pujaYear } = req.query
+    const match = { paidAmount: { $gt: 0 } }
+
+    if (pujaYear) match.pujaYear = Number(pujaYear)
+
+    // ------------------- MEMBER CONTRIBUTION -------------------
+    const memberAgg = await Member.aggregate([
+      { $match: { active: true } },
+      {
+        $group: {
+          _id: null,
+          totalPaid: { $sum: "$contribution" }
+        }
+      }
+    ])
+    const totalMember = memberAgg[0]?.totalPaid || 0
+
+    // ------------------- DONOR PAID -------------------
+    const donorAgg = await Transaction.aggregate([
+      { $match: { ...match, type: "Donation", donor: { $ne: null } } },
+      {
+        $group: {
+          _id: null,
+          totalPaid: { $sum: "$paidAmount" }
+        }
+      }
+    ])
+    const totalDonor = donorAgg[0]?.totalPaid || 0
+
+    // ------------------- CHANDA PAID -------------------
+    const chandaAgg = await Transaction.aggregate([
+      { $match: { ...match, type: "Chanda" } },
+      {
+        $group: {
+          _id: null,
+          totalPaid: { $sum: "$paidAmount" }
+        }
+      }
+    ])
+    const totalChanda = chandaAgg[0]?.totalPaid || 0
+
+    // ------------------- RESPONSE -------------------
+    res.json({
+      labels: ["Member Contribution", "Donor Paid", "Chanda Paid"],
+      datasets: [
+        {
+          label: "Paid Collection",
+          data: [totalMember, totalDonor, totalChanda],
+          backgroundColor: ["#A78BFA", "#60A5FA", "#14B8A6"]
+        }
+      ]
+    })
+  } catch (err) {
+    console.error("Bar Graph Error:", err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
 
 /* =========================================================
    📅 DONOR BY DATE (with names)
@@ -309,34 +378,38 @@ export const donorByDate = async (req, res) => {
 /* =========================================================
    📈 EXPENSE BY DATE (line graph)
 ========================================================= */
-export const expenseByDate = async (req, res) => {
+export const expenseByItem = async (req, res) => {
   try {
     const { pujaYear } = req.query
     const match = {}
+
     if (pujaYear) match.pujaYear = Number(pujaYear)
 
+    // Return each expense entry with item, amount, and exact paidDate
     const data = await Expense.aggregate([
       { $match: match },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$paidDate" } },
-          total: { $sum: "$amount" }
-        }
-      },
-      { $sort: { "_id": 1 } },
+
+      // Project only needed fields
       {
         $project: {
-          date: "$_id",
-          total: 1,
+          category: 1,
+          amount: 1,
+          paidDate: 1, // keeps full date + time
           _id: 0
         }
-      }
+      },
+ 
+
+      // Optional: sort by paidDate
+      { $sort: { paidDate: 1 } }
     ])
     res.json(data)
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
 }
+
+
 
 
 /* =========================================================

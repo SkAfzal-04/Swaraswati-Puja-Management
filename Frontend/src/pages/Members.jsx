@@ -18,10 +18,8 @@ export default function Members() {
   const [error, setError] = useState("")
   const [deleteId, setDeleteId] = useState(null)
 
- const { role, isAuthenticated,token } = useAuth()
-
-const canEdit = role === "Admin" || role === "Manager"
-
+  const { role, isAuthenticated, token } = useAuth()
+  const canEdit = role === "Admin" || role === "Manager"
 
   /* ================= FETCH MEMBERS ================= */
   const fetchMembers = async () => {
@@ -34,7 +32,7 @@ const canEdit = role === "Admin" || role === "Manager"
       setError("")
     } catch (err) {
       setError(err.message)
-      setMembers([]) // Reset members if error occurs
+      setMembers([])
       toast.error(err.message, { duration: 3000 })
     } finally {
       setLoading(false)
@@ -52,7 +50,7 @@ const canEdit = role === "Admin" || role === "Manager"
   )
 
   /* ================= ADD / EDIT ================= */
-  const handleAddOrEdit = member => {
+  const handleAddOrEdit = (member) => {
     if (!canEdit) {
       setEditingMember(member)
       setShowLogin(true)
@@ -79,7 +77,7 @@ const canEdit = role === "Admin" || role === "Manager"
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || "Failed to delete member")
 
-      setMembers(prev => prev.filter(m => m._id !== deleteId))
+      setMembers((prev) => prev.filter((m) => m._id !== deleteId))
       toast.success("Member deleted successfully ✅", { duration: 3000 })
       setDeleteId(null)
     } catch (err) {
@@ -88,9 +86,9 @@ const canEdit = role === "Admin" || role === "Manager"
     }
   }
 
-
   return (
     <section className="p-4 sm:p-8 space-y-6 bg-gradient-to-r from-orange-50 via-yellow-50 to-orange-50 min-h-screen">
+      {/* ================= HEADER ================= */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-4xl font-extrabold text-orange-600 drop-shadow-md">
           👥 Member Management
@@ -111,27 +109,25 @@ const canEdit = role === "Admin" || role === "Manager"
         </div>
       )}
 
-      {loading && <p className="text-gray-500 italic">Loading members...</p>}
-      {error && <p className="text-red-600 font-medium">{error}</p>}
-
-      {!loading && members.length > 0 && (
-        <div className="overflow-x-auto bg-white p-4 rounded-2xl shadow-lg border border-orange-200 hover:shadow-2xl transition-all duration-200
+      {/* ================= MEMBER TABLE WITH SKELETON ================= */}
+      <div className="overflow-x-auto bg-white p-4 rounded-2xl shadow-lg border border-orange-200 hover:shadow-2xl transition-all duration-200
           scrollbar-thin scrollbar-thumb-orange-400 scrollbar-track-orange-100 scrollbar-thumb-rounded-full scrollbar-track-rounded-full">
-          <MemberTable
-            members={members}
-            currentUserRole={role}
-            onView={setSelectedMember}
-            onEdit={handleAddOrEdit}
-            onDelete={id => setDeleteId(id)}
-          />
-        </div>
-      )}
+        <MemberTable
+          members={members}
+          currentUserRole={role}
+          onView={setSelectedMember}
+          onEdit={handleAddOrEdit}
+          onDelete={(id) => setDeleteId(id)}
+          loading={loading} // ✅ Pass loading to trigger skeleton
+        />
+      </div>
 
+      {/* ================= NO MEMBERS FOUND ================= */}
       {!loading && members.length === 0 && (
         <p className="text-gray-500 italic text-center">No members found</p>
       )}
 
-      {/* VIEW PROFILE */}
+      {/* ================= VIEW PROFILE ================= */}
       {selectedMember && !showForm && (
         <MemberProfile
           member={selectedMember}
@@ -140,13 +136,13 @@ const canEdit = role === "Admin" || role === "Manager"
         />
       )}
 
-      {/* ADD / EDIT FORM */}
+      {/* ================= ADD / EDIT FORM ================= */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <MemberForm
             selected={editingMember}
             onSuccess={() => {
-              fetchMembers()        // 🔥 refetch
+              fetchMembers()        // 🔥 refetch members
               setSelectedMember(null) // 🔥 clear stale profile
             }}
             onClose={() => {
@@ -154,22 +150,20 @@ const canEdit = role === "Admin" || role === "Manager"
               setEditingMember(null)
             }}
           />
-
         </div>
       )}
 
-      {/* LOGIN MODAL */}
+      {/* ================= LOGIN MODAL ================= */}
       {showLogin && (
-       <LoginModal
-  onClose={() => {
-    setShowLogin(false)
-    if (editingMember !== null) setShowForm(true)
-  }}
-/>
-
+        <LoginModal
+          onClose={() => {
+            setShowLogin(false)
+            if (editingMember !== null) setShowForm(true)
+          }}
+        />
       )}
 
-      {/* DELETE CONFIRMATION MODAL */}
+      {/* ================= DELETE CONFIRMATION MODAL ================= */}
       {deleteId && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
           <div className="bg-white p-6 rounded-2xl shadow-2xl flex flex-col gap-4 max-w-xs w-full border border-red-300">

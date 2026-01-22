@@ -76,4 +76,5 @@ export const getTopDonors = () =>
 export const getDonorByDate = () => apiFetch("/transactions/graphs/donor-date")
 export const getExpenseByDate = () =>
   apiFetch("/transactions/graphs/expense-date")
+export const getCollectionBarGraph = () =>apiFetch("/transactions/graphs/collection-bar")
 

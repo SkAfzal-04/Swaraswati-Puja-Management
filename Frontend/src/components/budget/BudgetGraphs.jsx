@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react";
 import {
   LineChart,
   Line,
@@ -11,8 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
   Cell,
-  Brush,
-} from "recharts"
+} from "recharts";
 
 import {
   getParaGraph,
@@ -21,202 +20,316 @@ import {
   getTopDonors,
   getDonorByDate,
   getExpenseByDate,
-} from "../../services/transactionApi"
+  getCollectionBarGraph,
+} from "../../services/transactionApi";
 
+/* =========================
+   SKELETONS
+========================= */
+function ChartSkeleton({ type = "bar" }) {
+  return (
+    <div className="bg-white p-6 rounded-xl shadow animate-pulse">
+      <div className="h-4 w-48 bg-gray-300 rounded mb-6" />
+      <div className="h-[300px] bg-gray-100 rounded-lg p-4">
+        {type === "bar" ? <BarSkeleton /> : <LineSkeleton />}
+      </div>
+    </div>
+  );
+}
+
+function BarSkeleton() {
+  return (
+    <div className="flex items-end gap-3 h-full">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex-1 bg-gray-300 rounded"
+          style={{ height: `${30 + i * 10}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function LineSkeleton() {
+  return (
+    <div className="relative h-full w-full">
+      <svg viewBox="0 0 100 50" className="w-full h-full">
+        <polyline
+          points="0,40 20,30 40,35 60,20 80,25 100,15"
+          fill="none"
+          stroke="#d1d5db"
+          strokeWidth="2"
+        />
+      </svg>
+    </div>
+  );
+}
+
+/* =========================
+   MAIN COMPONENT
+========================= */
 export default function BudgetGraphs() {
-  const [paraData, setParaData] = useState([])
-  const [dayData, setDayData] = useState([])
-  const [incomeVsExpenseData, setIncomeVsExpenseData] = useState([])
-  const [topDonorsData, setTopDonorsData] = useState([])
-  const [donorByDateData, setDonorByDateData] = useState([])
-  const [expenseData, setExpenseData] = useState([])
+  const [loading, setLoading] = useState(true);
+  const [paraData, setParaData] = useState([]);
+  const [dayData, setDayData] = useState([]);
+  const [incomeVsExpenseData, setIncomeVsExpenseData] = useState([]);
+  const [topDonorsData, setTopDonorsData] = useState([]);
+  const [donorByDateData, setDonorByDateData] = useState([]);
+  const [expenseData, setExpenseData] = useState([]);
+  const [collectionBarData, setCollectionBarData] = useState([]);
 
-  const colors = ["#4f46e5", "#f97316", "#10b981", "#e11d48", "#facc15"]
+
+  const colors = ["#4f46e5", "#f97316", "#10b981", "#e11d48", "#facc15"];
 
   useEffect(() => {
-    fetchGraphs()
-  }, [])
+    fetchGraphs();
+  }, []);
 
   const fetchGraphs = async () => {
     try {
-      const [para, day, incomeVsExpense, topDonors, donorByDate, expense] =
-        await Promise.all([
-          getParaGraph(),
-          getDayGraph(),
-          getIncomeVsExpense(),
-          getTopDonors(),
-          getDonorByDate(),
-          getExpenseByDate(),
-        ])
-        console.log(para, day, incomeVsExpense, topDonors, donorByDate, expense)
-      setParaData(para)
-      setDayData(day)
+      setLoading(true);
+      const [
+        para,
+        day,
+        incomeVsExpense,
+        topDonors,
+        donorByDate,
+        expense,
+        CollectionBarGraph
+      ] = await Promise.all([
+        getParaGraph(),
+        getDayGraph(),
+        getIncomeVsExpense(),
+        getTopDonors(),
+        getDonorByDate(),
+        getExpenseByDate(),
+        getCollectionBarGraph(),
+      ]);
 
-      // Combine income vs expense by date for line chart
-      const incomeMap = {}
-      incomeVsExpense.forEach((d) => {
-        incomeMap[d.date] = { date: d.date, income: d.income || 0 }
-      })
-
-      const expenseMap = {}
-      expense.forEach((d) => {
-        expenseMap[d.date] = { date: d.date, expense: d.total || 0 }
-      })
-
-      const allDates = Array.from(
-        new Set([...incomeVsExpense.map((d) => d.date), ...expense.map((d) => d.date)])
-      ).sort()
-
-      const combinedData = allDates.map((date) => ({
-        date,
-        income: incomeMap[date]?.income || 0,
-        expense: expenseMap[date]?.expense || 0,
-      }))
-
-      setIncomeVsExpenseData(combinedData)
+      setParaData(para);
+      setDayData(day);
+      setExpenseData(expense);
+      setIncomeVsExpenseData(incomeVsExpense);
+      setCollectionBarData(CollectionBarGraph);
 
       // Top donors
-      setTopDonorsData(topDonors.map((d) => ({ donor: d.name, total: d.total })))
+      setTopDonorsData(
+        topDonors.map((d) => ({
+          donor: d.name,
+          total: Number(d.total) || 0,
+        }))
+      );
 
-      // Donor contributions over time
-      const donorMap = {}
+      // Donor over time
+      const donorMap = {};
       donorByDate.forEach((d) => {
-        const date = d.date
-        if (!donorMap[date]) donorMap[date] = { date }
-        donorMap[date][d.name] = d.totalPaid
-      })
-      setDonorByDateData(Object.values(donorMap))
-
-      // Expense by date
-      setExpenseData(expense)
+        if (!donorMap[d.date]) donorMap[d.date] = { date: d.date };
+        donorMap[d.date][d.name] = Number(d.totalPaid) || 0;
+      });
+      setDonorByDateData(Object.values(donorMap));
     } catch (err) {
-      console.error("Failed to fetch graph data:", err)
+      console.error("Graph fetch failed:", err);
+    } finally {
+      setLoading(false);
     }
-  }
+  };
+
+  /* =========================
+     EXPENSE BY ITEM CHART
+  ========================= */
+  const expenseChartData = useMemo(() => {
+    return expenseData.map((d, i) => ({
+      id: i,
+      item: d.category,
+      amount: Number(d.amount) || 0,
+      date: d.paidDate || null,
+    }));
+  }, [expenseData]);
+
+  /* =========================
+     Y-AXIS FORMATTER
+  ========================= */
+  const formatPrice = (v) => {
+    const num = Number(v);
+    if (isNaN(num)) return v;
+    if (num >= 1000000) return `₹${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `₹${(num / 1000).toFixed(0)}K`;
+    return `₹${num}`;
+  };
+
+  const tooltipPrice = (v) => {
+    const num = Number(v);
+    return isNaN(num) ? v : `₹${num.toLocaleString()}`;
+  };
 
   return (
     <div className="space-y-8">
-      {/* PARA-WISE COLLECTION */}
-      <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition-shadow">
-        <h3 className="font-semibold mb-4 text-gray-700">Para-wise Collection</h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={paraData}>
-            <XAxis dataKey="_id" stroke="#4b5563" />
-            <YAxis stroke="#4b5563" />
-            <Tooltip />
-            <Bar dataKey="total" radius={[4, 4, 0, 0]}>
-              {paraData.map((_, index) => (
-                <Cell key={index} fill={colors[index % colors.length]} />
+      {/* PARA */}
+      {loading ? (
+        <ChartSkeleton />
+      ) : (
+        <ChartCard title="Para-wise Collection">
+          <BarChart data={paraData.map((d) => ({ ...d, total: Number(d.total) }))}>
+            <XAxis dataKey="_id" />
+            <YAxis tickFormatter={formatPrice} />
+            <Tooltip formatter={tooltipPrice} />
+            <Bar dataKey="total">
+              {paraData.map((_, i) => (
+                <Cell key={i} fill={colors[i % colors.length]} />
               ))}
             </Bar>
-            {paraData.length > 5 && <Brush dataKey="_id" height={30} stroke="#4b5563" />}
           </BarChart>
-        </ResponsiveContainer>
-      </div>
+        </ChartCard>
+      )}
+      {/* COLLECTION BAR CHART */}
+      {loading ? (
+        <ChartSkeleton type="bar" />
+      ) : (
+        <ChartCard title="Total Collection (Paid Only)">
+          <BarChart
+            data={collectionBarData.datasets[0]?.data.map((d, i) => ({
+              category: collectionBarData.labels[i],
+              value: d,
+            }))}
+          >
+            <XAxis dataKey="category" />
+            <YAxis tickFormatter={formatPrice} />
+            <Tooltip formatter={tooltipPrice} />
+            <Bar dataKey="value">
+              {collectionBarData.datasets[0]?.data.map((_, i) => (
+                <Cell key={i} fill={colors[i % colors.length]} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ChartCard>
+      )}
 
-      {/* DAY-WISE COLLECTION */}
-      <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition-shadow">
-        <h3 className="font-semibold mb-4 text-gray-700">Day-wise Collection</h3>
-
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={dayData}>
+      {/* DAY */}
+      {loading ? (
+        <ChartSkeleton type="line" />
+      ) : (
+        <ChartCard title="Day-wise Collection">
+          <LineChart data={dayData.map((d) => ({ ...d, total: Number(d.total) }))}>
             <CartesianGrid strokeDasharray="3 3" />
-
-            {/* 🔥 FIX HERE */}
-            <XAxis dataKey="date" stroke="#4b5563" />
-            <YAxis stroke="#4b5563" />
-            <Tooltip />
-
-            <Line
-              type="monotone"
-              dataKey="total"
-              stroke="#10b981"
-              strokeWidth={2}
-              dot={{ r: 4 }}     
-              activeDot={{ r: 6 }}
-            />
-
-            {dayData.length > 5 && (
-              <Brush dataKey="date" height={30} stroke="#10b981" />
-            )}
+            <XAxis dataKey="date" />
+            <YAxis tickFormatter={formatPrice} />
+            <Tooltip formatter={tooltipPrice} />
+            <Line dataKey="total" stroke="#10b981" strokeWidth={2} />
           </LineChart>
-        </ResponsiveContainer>
-      </div>
+        </ChartCard>
+      )}
 
-
-      {/* INCOME VS EXPENSE BY DATE */}
-      <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition-shadow">
-        <h3 className="font-semibold mb-4 text-gray-700">Income vs Expense Over Time</h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={incomeVsExpenseData}>
+      {/* INCOME VS EXPENSE */}
+      {loading ? (
+        <ChartSkeleton type="line" />
+      ) : (
+        <ChartCard title="Income vs Expense">
+          <LineChart
+            data={incomeVsExpenseData.map((d) => ({
+              date: d.date,
+              income: Number(d.income) || 0,
+              expense: Number(d.expense) || 0,
+            }))}
+          >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" stroke="#4b5563" />
-            <YAxis stroke="#4b5563" />
-            <Tooltip />
+            <XAxis dataKey="date" />
+            <YAxis tickFormatter={formatPrice} />
+            <Tooltip formatter={tooltipPrice} />
             <Legend />
-            <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} />
-            <Line type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={2} />
-            {incomeVsExpenseData.length > 5 && <Brush dataKey="date" height={30} stroke="#4b5563" />}
+            <Line dataKey="income" stroke="#10b981" />
+            <Line dataKey="expense" stroke="#ef4444" />
           </LineChart>
-        </ResponsiveContainer>
-      </div>
+        </ChartCard>
+      )}
 
       {/* TOP DONORS */}
-      <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition-shadow">
-        <h3 className="font-semibold mb-4 text-gray-700">Top Donors</h3>
-        <ResponsiveContainer width="100%" height={300}>
+      {loading ? (
+        <ChartSkeleton />
+      ) : (
+        <ChartCard title="Top Donors">
           <BarChart data={topDonorsData}>
-            <XAxis dataKey="donor" stroke="#4b5563" />
-            <YAxis stroke="#4b5563" />
-            <Tooltip />
-            <Bar dataKey="total" fill="#f97316" radius={[4, 4, 0, 0]} />
-            {topDonorsData.length > 5 && <Brush dataKey="donor" height={30} stroke="#f97316" />}
+            <XAxis dataKey="donor" />
+            <YAxis tickFormatter={formatPrice} />
+            <Tooltip formatter={tooltipPrice} />
+            <Bar dataKey="total" fill="#f97316" />
           </BarChart>
-        </ResponsiveContainer>
-      </div>
+        </ChartCard>
+      )}
 
-      {/* DONOR CONTRIBUTION OVER TIME */}
-      <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition-shadow">
-        <h3 className="font-semibold mb-4 text-gray-700">Donor Contribution Over Time</h3>
-        <ResponsiveContainer width="100%" height={300}>
+      {/* DONOR OVER TIME */}
+      {loading ? (
+        <ChartSkeleton type="line" />
+      ) : (
+        <ChartCard title="Donor Contribution Over Time">
           <LineChart data={donorByDateData}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" stroke="#4b5563" />
-            <YAxis stroke="#4b5563" />
-            <Tooltip />
+            <XAxis dataKey="date" />
+            <YAxis tickFormatter={formatPrice} />
+            <Tooltip formatter={tooltipPrice} />
             <Legend />
             {donorByDateData[0] &&
               Object.keys(donorByDateData[0])
                 .filter((k) => k !== "date")
-                .map((donor, index) => (
+                .map((donor, i) => (
                   <Line
                     key={donor}
-                    type="monotone"
                     dataKey={donor}
-                    stroke={colors[index % colors.length]}
-                    strokeWidth={2}
+                    stroke={colors[i % colors.length]}
                   />
                 ))}
-            {donorByDateData.length > 5 && <Brush dataKey="date" height={30} stroke="#4b5563" />}
           </LineChart>
-        </ResponsiveContainer>
-      </div>
+        </ChartCard>
+      )}
 
-      {/* EXPENSE BY DATE */}
-      <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition-shadow">
-        <h3 className="font-semibold mb-4 text-gray-700">Expense Over Time</h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={expenseData}>
+      {/* EXPENSE BY ITEM */}
+      {loading ? (
+        <ChartSkeleton type="line" />
+      ) : (
+        <ChartCard title="Expense by Item">
+          <LineChart data={expenseChartData}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" stroke="#4b5563" />
-            <YAxis stroke="#4b5563" />
-            <Tooltip />
-            <Line type="monotone" dataKey="total" stroke="#ef4444" strokeWidth={2} />
-            {expenseData.length > 5 && <Brush dataKey="date" height={30} stroke="#ef4444" />}
+            <XAxis dataKey="item" angle={-30} height={80} textAnchor="end" />
+            <YAxis tickFormatter={formatPrice} />
+            <Tooltip
+              content={({ payload }) => {
+                if (!payload?.length) return null;
+                const { item, amount, date } = payload[0].payload;
+                return (
+                  <div className="bg-white p-2 border rounded shadow text-sm">
+                    <p>
+                      <b>Item:</b> {item}
+                    </p>
+                    <p>
+                      <b>Amount:</b> {tooltipPrice(amount)}
+                    </p>
+                    {date && (
+                      <p>
+                        <b>Date:</b> {new Date(date).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                );
+              }}
+            />
+            <Line dataKey="amount" stroke="#4f46e5" strokeWidth={2} dot={{ r: 6 }} activeDot={{ r: 8 }} />
           </LineChart>
-        </ResponsiveContainer>
-      </div>
-
+        </ChartCard>
+      )}
     </div>
-  )
+  );
+}
+
+/* =========================
+   CARD WRAPPER
+========================= */
+function ChartCard({ title, children }) {
+  return (
+    <div className="bg-white p-6 rounded-xl shadow">
+      <h3 className="font-semibold mb-4 text-gray-700">{title}</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        {children}
+      </ResponsiveContainer>
+    </div>
+  );
 }
